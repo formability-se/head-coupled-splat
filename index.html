@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Head-Coupled Gaussian Splat Viewer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0a;
+      color: #e0e0e0;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    #three-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Webcam preview */
+    #webcam-container {
+      position: fixed;
+      bottom: 16px;
+      left: 16px;
+      z-index: 10;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 2px solid rgba(79, 70, 229, 0.5);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+      opacity: 0.85;
+      transition: opacity 0.2s;
+    }
+    #webcam-container:hover { opacity: 1; }
+
+    #webcam {
+      width: 192px;
+      height: 144px;
+      object-fit: cover;
+      transform: scaleX(-1);
+      display: block;
+    }
+
+    #webcam-label {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 4px 8px;
+      background: rgba(0, 0, 0, 0.7);
+      font-size: 10px;
+      color: #818cf8;
+      text-align: center;
+      letter-spacing: 0.5px;
+    }
+
+    /* Debug overlay */
+    #debug {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(79, 70, 229, 0.3);
+      border-radius: 12px;
+      padding: 14px 18px;
+      font-size: 12px;
+      line-height: 1.8;
+      min-width: 220px;
+      transition: opacity 0.3s;
+    }
+    #debug.hidden { opacity: 0; pointer-events: none; }
+    #debug .label { color: #818cf8; }
+    #debug .value { color: #e0e0e0; font-variant-numeric: tabular-nums; }
+
+    /* Controls panel */
+    #controls {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(79, 70, 229, 0.3);
+      border-radius: 12px;
+      padding: 18px;
+      min-width: 240px;
+    }
+
+    #controls h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #818cf8;
+      margin-bottom: 14px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    #controls h3 .toggle-arrow {
+      font-size: 14px;
+      transition: transform 0.2s;
+    }
+    #controls.collapsed { min-width: unset; padding: 10px 12px; }
+    #controls.collapsed h3 { margin-bottom: 0; }
+    #controls.collapsed h3 .toggle-arrow { transform: rotate(180deg); }
+    #controls.collapsed h3 .toggle-label { display: none; }
+    #controls.collapsed .controls-body { display: none; }
+
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .control-row label {
+      font-size: 12px;
+      color: #a0a0a0;
+    }
+
+    .control-row .val {
+      font-size: 11px;
+      color: #818cf8;
+      min-width: 36px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      margin-top: 4px;
+      accent-color: #4f46e5;
+      height: 4px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border: 1px solid rgba(79, 70, 229, 0.4);
+      border-radius: 8px;
+      background: rgba(79, 70, 229, 0.15);
+      color: #c7d2fe;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .btn:hover {
+      background: rgba(79, 70, 229, 0.3);
+      border-color: #4f46e5;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    /* Loading state */
+    #loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #0a0a0a;
+      z-index: 100;
+      transition: opacity 0.5s;
+    }
+    #loading.fade-out { opacity: 0; pointer-events: none; }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(79, 70, 229, 0.2);
+      border-top-color: #4f46e5;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #loading p {
+      margin-top: 16px;
+      color: #818cf8;
+      font-size: 13px;
+    }
+
+    /* Status toast */
+    #status {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      z-index: 10;
+      padding: 10px 16px;
+      background: rgba(79, 70, 229, 0.2);
+      border: 1px solid rgba(79, 70, 229, 0.4);
+      border-radius: 8px;
+      font-size: 12px;
+      color: #c7d2fe;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    #status.visible { opacity: 1; }
+
+    /* File input */
+    #file-input { display: none; }
+  </style>
+</head>
+<body>
+
+  <!-- Loading screen -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <p id="loading-text">Initializing...</p>
+  </div>
+
+  <!-- Three.js canvas -->
+  <canvas id="three-canvas"></canvas>
+
+  <!-- Webcam preview -->
+  <div id="webcam-container">
+    <video id="webcam" autoplay playsinline muted></video>
+    <div id="webcam-label">FACE TRACKING</div>
+  </div>
+
+  <!-- Debug overlay -->
+  <div id="debug" class="hidden">
+    <div><span class="label">Head X: </span><span class="value" id="dbg-x">0.00</span></div>
+    <div><span class="label">Head Y: </span><span class="value" id="dbg-y">0.00</span></div>
+    <div><span class="label">Head Z: </span><span class="value" id="dbg-z">0.00</span></div>
+    <div><span class="label">Eye dist: </span><span class="value" id="dbg-eye">0.00</span></div>
+    <div><span class="label">FPS: </span><span class="value" id="dbg-fps">0</span></div>
+    <div><span class="label">Status: </span><span class="value" id="dbg-status">init</span></div>
+    <div style="margin-top:8px;border-top:1px solid rgba(79,70,229,0.2);padding-top:8px;font-size:11px;color:#666;">
+      WASD move | Mouse drag rotate<br>
+      Scroll zoom | Q/E up/down | Shift fast
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div id="controls" class="collapsed">
+    <h3 id="controls-toggle"><span class="toggle-label">Controls </span><span class="toggle-arrow">&#9660;</span></h3>
+    <div class="controls-body">
+    <div class="control-row">
+      <label>Sensitivity</label>
+      <span class="val" id="sens-val">1.0</span>
+    </div>
+    <input type="range" id="sensitivity" min="0.1" max="3.0" step="0.1" value="1.0" />
+
+    <div class="control-row">
+      <label>Smoothing</label>
+      <span class="val" id="smooth-val">0.15</span>
+    </div>
+    <input type="range" id="smoothing" min="0.03" max="0.5" step="0.01" value="0.15" />
+
+    <div class="control-row">
+      <label>Z Sensitivity</label>
+      <span class="val" id="zsens-val">1.0</span>
+    </div>
+    <input type="range" id="z-sensitivity" min="0.1" max="3.0" step="0.1" value="1.0" />
+
+    <div style="margin-top:14px;border-top:1px solid rgba(79,70,229,0.2);padding-top:12px;">
+      <div style="font-size:11px;color:#818cf8;margin-bottom:8px;letter-spacing:0.5px;text-transform:uppercase;">Model Rotation</div>
+
+      <div class="control-row">
+        <label>Pitch (X)</label>
+        <span class="val" id="mrot-x-val">0</span>
+      </div>
+      <input type="range" id="mrot-x" min="-180" max="180" step="5" value="0" />
+
+      <div class="control-row">
+        <label>Yaw (Y)</label>
+        <span class="val" id="mrot-y-val">0</span>
+      </div>
+      <input type="range" id="mrot-y" min="-180" max="180" step="5" value="0" />
+
+      <div class="control-row">
+        <label>Roll (Z)</label>
+        <span class="val" id="mrot-z-val">0</span>
+      </div>
+      <input type="range" id="mrot-z" min="-180" max="180" step="5" value="0" />
+    </div>
+
+    <div class="btn-row" style="margin-top:12px;">
+      <button class="btn" id="btn-debug">Debug</button>
+      <button class="btn" id="btn-pause">Pause</button>
+      <button class="btn" id="btn-load">Load .spz/.ply</button>
+    </div>
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn" id="btn-save-pos" style="flex:1;">Save position</button>
+      <button class="btn" id="btn-reset-pos">Reset</button>
+    </div>
+    <div id="pos-status" style="font-size:10px;color:#666;margin-top:6px;height:14px;"></div>
+    </div><!-- .controls-body -->
+  </div>
+
+  <input type="file" id="file-input" accept=".spz,.ply,.splat,.ksplat,.sogs,.sog" />
+
+  <div id="status"></div>
+
+  <!-- Pre-load MediaPipe as ESM module, expose on window -->
+  <script type="module">
+    import { FaceDetector, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+    window.__mediapipe = { FaceDetector, FilesetResolver };
+    window.dispatchEvent(new Event("mediapipe-ready"));
+  </script>
+
+  <!-- Import map for Three.js + SparkJS only -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://esm.sh/three@0.171.0",
+        "three/": "https://esm.sh/three@0.171.0/",
+        "@sparkjsdev/spark": "https://esm.sh/@sparkjsdev/spark@0.1.10?external=three"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { SplatMesh } from "@sparkjsdev/spark";
+
+    // ── DOM refs ──
+    const canvas = document.getElementById("three-canvas");
+    const video = document.getElementById("webcam");
+    const loadingEl = document.getElementById("loading");
+    const loadingText = document.getElementById("loading-text");
+    const statusEl = document.getElementById("status");
+    const debugEl = document.getElementById("debug");
+    const fileInput = document.getElementById("file-input");
+
+    const dbgX = document.getElementById("dbg-x");
+    const dbgY = document.getElementById("dbg-y");
+    const dbgZ = document.getElementById("dbg-z");
+    const dbgEye = document.getElementById("dbg-eye");
+    const dbgFps = document.getElementById("dbg-fps");
+    const dbgStatus = document.getElementById("dbg-status");
+
+    const sensSlider = document.getElementById("sensitivity");
+    const sensVal = document.getElementById("sens-val");
+    const smoothSlider = document.getElementById("smoothing");
+    const smoothVal = document.getElementById("smooth-val");
+    const zSensSlider = document.getElementById("z-sensitivity");
+    const zSensVal = document.getElementById("zsens-val");
+
+    // ── State ──
+    let sensitivity = 1.0;
+    let smoothingAlpha = 0.15;
+    let zSensitivity = 1.0;
+    let paused = false;
+    let debugVisible = false;
+
+    // Smoothed head position (normalized 0-1 for X/Y, raw for Z)
+    let smoothX = 0.5;
+    let smoothY = 0.5;
+    let smoothZ = 1.0;
+    let referenceEyeDist = 0;
+    let faceDetected = false;
+
+    // FPS counter
+    let frameCount = 0;
+    let lastFpsTime = performance.now();
+
+    // Webcam stream ref for cleanup
+    let webcamStream = null;
+
+    // ── Manual navigation state ──
+    // Base position/rotation controlled by WASD + mouse
+    const basePosition = new THREE.Vector3(0, 0, 3);
+    const baseEuler = new THREE.Euler(0, 0, 0, "YXZ"); // yaw-pitch order
+    const moveSpeed = 3.0;  // units per second
+    const rotateSpeed = 0.003; // radians per pixel
+    const scrollSpeed = 0.5;
+
+    // Key tracking
+    const keysDown = new Set();
+    let lastFrameTime = performance.now();
+
+    // Mouse drag state
+    let isDragging = false;
+    let dragButton = -1; // 0=left, 2=right
+
+    // Track if pointer is over UI (don't capture drag on controls)
+    let pointerOverUI = false;
+
+    // Model rotation (degrees)
+    let modelRotX = 0, modelRotY = 0, modelRotZ = 0;
+    const mrotXSlider = document.getElementById("mrot-x");
+    const mrotYSlider = document.getElementById("mrot-y");
+    const mrotZSlider = document.getElementById("mrot-z");
+    const mrotXVal = document.getElementById("mrot-x-val");
+    const mrotYVal = document.getElementById("mrot-y-val");
+    const mrotZVal = document.getElementById("mrot-z-val");
+
+    // ── UI Bindings ──
+    sensSlider.addEventListener("input", () => {
+      sensitivity = parseFloat(sensSlider.value);
+      sensVal.textContent = sensitivity.toFixed(1);
+    });
+    smoothSlider.addEventListener("input", () => {
+      smoothingAlpha = parseFloat(smoothSlider.value);
+      smoothVal.textContent = smoothingAlpha.toFixed(2);
+    });
+    zSensSlider.addEventListener("input", () => {
+      zSensitivity = parseFloat(zSensSlider.value);
+      zSensVal.textContent = zSensitivity.toFixed(1);
+    });
+
+    function applyModelRotation() {
+      if (!currentSplat) return;
+      const deg2rad = Math.PI / 180;
+      currentSplat.rotation.set(modelRotX * deg2rad, modelRotY * deg2rad, modelRotZ * deg2rad);
+    }
+
+    mrotXSlider.addEventListener("input", () => {
+      modelRotX = parseInt(mrotXSlider.value);
+      mrotXVal.textContent = modelRotX + "\u00b0";
+      applyModelRotation();
+    });
+    mrotYSlider.addEventListener("input", () => {
+      modelRotY = parseInt(mrotYSlider.value);
+      mrotYVal.textContent = modelRotY + "\u00b0";
+      applyModelRotation();
+    });
+    mrotZSlider.addEventListener("input", () => {
+      modelRotZ = parseInt(mrotZSlider.value);
+      mrotZVal.textContent = modelRotZ + "\u00b0";
+      applyModelRotation();
+    });
+
+    function setModelRotationSliders(rx, ry, rz) {
+      modelRotX = rx; modelRotY = ry; modelRotZ = rz;
+      mrotXSlider.value = rx; mrotYSlider.value = ry; mrotZSlider.value = rz;
+      mrotXVal.textContent = rx + "\u00b0";
+      mrotYVal.textContent = ry + "\u00b0";
+      mrotZVal.textContent = rz + "\u00b0";
+      applyModelRotation();
+    }
+
+    document.getElementById("controls-toggle").addEventListener("click", () => {
+      document.getElementById("controls").classList.toggle("collapsed");
+    });
+
+    document.getElementById("btn-debug").addEventListener("click", () => {
+      debugVisible = !debugVisible;
+      debugEl.classList.toggle("hidden", !debugVisible);
+    });
+
+    document.getElementById("btn-pause").addEventListener("click", () => {
+      paused = !paused;
+      document.getElementById("btn-pause").textContent = paused ? "Resume" : "Pause";
+    });
+
+    document.getElementById("btn-load").addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) loadSplatFile(file);
+    });
+
+    // ── Keyboard input (WASD + QE + Shift) ──
+    window.addEventListener("keydown", (e) => {
+      // Don't capture if typing in an input
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      keysDown.add(e.code);
+    });
+    window.addEventListener("keyup", (e) => {
+      keysDown.delete(e.code);
+    });
+    // Clear keys on blur (tab switch etc)
+    window.addEventListener("blur", () => keysDown.clear());
+
+    // ── Mouse drag for rotation ──
+    canvas.addEventListener("mousedown", (e) => {
+      if (pointerOverUI) return;
+      isDragging = true;
+      dragButton = e.button;
+      canvas.requestPointerLock?.();
+    });
+
+    window.addEventListener("mouseup", () => {
+      isDragging = false;
+      dragButton = -1;
+      document.exitPointerLock?.();
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!isDragging) return;
+      const dx = e.movementX || 0;
+      const dy = e.movementY || 0;
+      // Left-click drag or right-click drag: rotate
+      baseEuler.y -= dx * rotateSpeed;
+      baseEuler.x -= dy * rotateSpeed;
+      // Clamp pitch to avoid flipping
+      baseEuler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, baseEuler.x));
+    });
+
+    // Scroll to move forward/backward
+    canvas.addEventListener("wheel", (e) => {
+      if (pointerOverUI) return;
+      e.preventDefault();
+      const dir = new THREE.Vector3(0, 0, -1);
+      dir.applyEuler(baseEuler);
+      basePosition.addScaledVector(dir, -Math.sign(e.deltaY) * scrollSpeed);
+    }, { passive: false });
+
+    // Prevent context menu on canvas
+    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    // Track pointer over UI panels
+    for (const el of [debugEl, document.getElementById("controls"), document.getElementById("webcam-container")]) {
+      el.addEventListener("pointerenter", () => { pointerOverUI = true; });
+      el.addEventListener("pointerleave", () => { pointerOverUI = false; });
+    }
+
+    // ── WASD movement update (called per frame) ──
+    function updateMovement(dt) {
+      const speed = keysDown.has("ShiftLeft") || keysDown.has("ShiftRight")
+        ? moveSpeed * 3.0
+        : moveSpeed;
+
+      // Build direction vectors from current orientation
+      const forward = new THREE.Vector3(0, 0, -1).applyEuler(baseEuler);
+      const right = new THREE.Vector3(1, 0, 0).applyEuler(baseEuler);
+      const up = new THREE.Vector3(0, 1, 0);
+
+      if (keysDown.has("KeyW")) basePosition.addScaledVector(forward, speed * dt);
+      if (keysDown.has("KeyS")) basePosition.addScaledVector(forward, -speed * dt);
+      if (keysDown.has("KeyA")) basePosition.addScaledVector(right, -speed * dt);
+      if (keysDown.has("KeyD")) basePosition.addScaledVector(right, speed * dt);
+      if (keysDown.has("KeyQ") || keysDown.has("Space")) basePosition.addScaledVector(up, speed * dt);
+      if (keysDown.has("KeyE") || keysDown.has("ControlLeft")) basePosition.addScaledVector(up, -speed * dt);
+    }
+
+    // Release webcam on page unload
+    window.addEventListener("beforeunload", () => {
+      if (webcamStream) {
+        webcamStream.getTracks().forEach(t => t.stop());
+      }
+    });
+
+    function showStatus(msg, duration = 3000) {
+      statusEl.textContent = msg;
+      statusEl.classList.add("visible");
+      setTimeout(() => statusEl.classList.remove("visible"), duration);
+    }
+
+    function setDbgStatus(s) {
+      if (debugVisible) dbgStatus.textContent = s;
+    }
+
+    // ── Three.js Setup ──
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: false,
+      alpha: false,
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0a0a);
+
+    const fov = 60;
+    const near = 0.1;
+    const far = 500;
+    const camera = new THREE.PerspectiveCamera(
+      fov,
+      window.innerWidth / window.innerHeight,
+      near,
+      far
+    );
+    camera.position.set(0, 0, 3);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+
+    // ── Current splat reference ──
+    let currentSplat = null;
+    let currentModelName = "butterfly.spz"; // default
+
+    const STORAGE_PREFIX = "hcsplat_pos_";
+    const LAST_MODEL_KEY = "hcsplat_last_model";
+    const DB_NAME = "hcsplat_files";
+    const DB_STORE = "splats";
+    const posStatusEl = document.getElementById("pos-status");
+
+    // ── IndexedDB for caching loaded splat files ──
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(DB_STORE);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function cacheSplatFile(name, blob) {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(DB_STORE, "readwrite");
+        tx.objectStore(DB_STORE).put(blob, name);
+        await new Promise((r, j) => { tx.oncomplete = r; tx.onerror = j; });
+      } catch (e) { console.warn("Failed to cache splat:", e); }
+    }
+
+    async function getCachedSplat(name) {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(DB_STORE, "readonly");
+        const req = tx.objectStore(DB_STORE).get(name);
+        return new Promise((r) => { req.onsuccess = () => r(req.result || null); req.onerror = () => r(null); });
+      } catch { return null; }
+    }
+
+    function rememberLastModel(name, url) {
+      localStorage.setItem(LAST_MODEL_KEY, JSON.stringify({ name, url: url || null }));
+    }
+
+    function getLastModel() {
+      try { return JSON.parse(localStorage.getItem(LAST_MODEL_KEY)); } catch { return null; }
+    }
+
+    function getStorageKey() {
+      return STORAGE_PREFIX + currentModelName;
+    }
+
+    function savePosition() {
+      const data = {
+        px: basePosition.x, py: basePosition.y, pz: basePosition.z,
+        rx: baseEuler.x, ry: baseEuler.y, rz: baseEuler.z,
+        mrx: modelRotX, mry: modelRotY, mrz: modelRotZ,
+      };
+      localStorage.setItem(getStorageKey(), JSON.stringify(data));
+      posStatusEl.textContent = `Saved for "${currentModelName}"`;
+      posStatusEl.style.color = "#818cf8";
+      setTimeout(() => { posStatusEl.textContent = ""; }, 2000);
+      showStatus(`Position saved for ${currentModelName}`);
+    }
+
+    function loadSavedPosition() {
+      const raw = localStorage.getItem(getStorageKey());
+      if (!raw) return false;
+      try {
+        const data = JSON.parse(raw);
+        basePosition.set(data.px, data.py, data.pz);
+        baseEuler.set(data.rx, data.ry, data.rz);
+        // Restore model rotation if saved
+        if (data.mrx !== undefined) {
+          setModelRotationSliders(data.mrx, data.mry, data.mrz);
+        }
+        posStatusEl.textContent = `Restored position + rotation`;
+        posStatusEl.style.color = "#818cf8";
+        setTimeout(() => { posStatusEl.textContent = ""; }, 2000);
+        return true;
+      } catch { return false; }
+    }
+
+    function resetPosition() {
+      basePosition.set(0, 0, 3);
+      baseEuler.set(0, 0, 0);
+      setModelRotationSliders(0, 0, 0);
+      // Also remove from storage
+      localStorage.removeItem(getStorageKey());
+      posStatusEl.textContent = "Position reset";
+      posStatusEl.style.color = "#666";
+      setTimeout(() => { posStatusEl.textContent = ""; }, 2000);
+      showStatus("Position reset");
+    }
+
+    document.getElementById("btn-save-pos").addEventListener("click", savePosition);
+    document.getElementById("btn-reset-pos").addEventListener("click", resetPosition);
+
+    async function loadSplatURL(url, modelName, remoteUrl) {
+      if (currentSplat) {
+        scene.remove(currentSplat);
+        currentSplat.dispose?.();
+      }
+      loadingText.textContent = "Loading splat...";
+      loadingEl.classList.remove("fade-out");
+      loadingEl.style.display = "flex";
+
+      if (modelName) currentModelName = modelName;
+
+      try {
+        const splat = new SplatMesh({ url });
+        scene.add(splat);
+        currentSplat = splat;
+        await new Promise((r) => setTimeout(r, 2000));
+        loadingEl.classList.add("fade-out");
+        setTimeout(() => { loadingEl.style.display = "none"; }, 500);
+
+        // Remember this model
+        rememberLastModel(currentModelName, remoteUrl || null);
+
+        // Try to restore saved position for this model
+        if (loadSavedPosition()) {
+          applyModelRotation();
+          showStatus(`Splat loaded — position restored`);
+        } else {
+          basePosition.set(0, 0, 3);
+          baseEuler.set(0, 0, 0);
+          setModelRotationSliders(0, 0, 0);
+          showStatus("Splat loaded");
+        }
+      } catch (err) {
+        console.error("Failed to load splat:", err);
+        loadingText.textContent = "Failed to load splat. Check console.";
+      }
+    }
+
+    async function loadSplatFile(file) {
+      const url = URL.createObjectURL(file);
+      // Cache the file in IndexedDB so we can reload it next session
+      cacheSplatFile(file.name, file);
+      loadSplatURL(url, file.name, null);
+      showStatus(`Loading: ${file.name}`);
+    }
+
+    // ── MediaPipe Face Detection ──
+    // Loaded via separate <script type="module"> that sets window.__mediapipe
+    let faceDetector = null;
+
+    async function waitForMediaPipe() {
+      if (window.__mediapipe) return window.__mediapipe;
+      return new Promise((resolve) => {
+        window.addEventListener("mediapipe-ready", () => resolve(window.__mediapipe), { once: true });
+      });
+    }
+
+    async function initFaceDetection() {
+      setDbgStatus("loading mediapipe...");
+      loadingText.textContent = "Loading face detection...";
+
+      const { FaceDetector, FilesetResolver } = await waitForMediaPipe();
+
+      setDbgStatus("loading wasm...");
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+      );
+
+      setDbgStatus("creating detector...");
+      faceDetector = await FaceDetector.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+          delegate: "GPU",
+        },
+        runningMode: "VIDEO",
+        minDetectionConfidence: 0.5,
+      });
+
+      setDbgStatus("face detection ready");
+      showStatus("Face detection ready");
+    }
+
+    async function initWebcam() {
+      loadingText.textContent = "Requesting webcam access...";
+      setDbgStatus("requesting camera...");
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+        });
+        webcamStream = stream;
+        video.srcObject = stream;
+        await new Promise((resolve) => {
+          video.onloadedmetadata = () => {
+            video.play();
+            resolve();
+          };
+        });
+        setDbgStatus("webcam active");
+        showStatus("Webcam active");
+      } catch (err) {
+        console.error("Webcam error:", err);
+        setDbgStatus("webcam denied: " + err.message);
+        loadingText.textContent = "Webcam access denied. Please allow camera and reload.";
+        throw err;
+      }
+    }
+
+    // ── Head tracking ──
+    let lastVideoTime = -1;
+
+    function detectFace() {
+      if (!faceDetector || paused) return;
+      if (video.readyState < 2) return;
+      if (video.currentTime === lastVideoTime) return;
+
+      lastVideoTime = video.currentTime;
+      const startTime = performance.now();
+
+      try {
+        const result = faceDetector.detectForVideo(video, startTime);
+
+        if (result.detections && result.detections.length > 0) {
+          const detection = result.detections[0];
+          faceDetected = true;
+
+          // Bounding box center (normalized 0-1)
+          const bbox = detection.boundingBox;
+          const rawX = (bbox.originX + bbox.width / 2) / video.videoWidth;
+          const rawY = (bbox.originY + bbox.height / 2) / video.videoHeight;
+
+          // Inter-eye distance for Z estimation
+          const keypoints = detection.keypoints;
+          let eyeDist = 0.1;
+          if (keypoints && keypoints.length >= 2) {
+            const dx = keypoints[0].x - keypoints[1].x;
+            const dy = keypoints[0].y - keypoints[1].y;
+            eyeDist = Math.sqrt(dx * dx + dy * dy);
+          }
+
+          if (referenceEyeDist === 0) {
+            referenceEyeDist = eyeDist;
+          }
+
+          const rawZ = referenceEyeDist / Math.max(eyeDist, 0.01);
+
+          // EMA smoothing
+          const a = smoothingAlpha;
+          smoothX = a * rawX + (1 - a) * smoothX;
+          smoothY = a * rawY + (1 - a) * smoothY;
+          smoothZ = a * rawZ + (1 - a) * smoothZ;
+
+          if (debugVisible) {
+            dbgX.textContent = smoothX.toFixed(3);
+            dbgY.textContent = smoothY.toFixed(3);
+            dbgZ.textContent = smoothZ.toFixed(3);
+            dbgEye.textContent = eyeDist.toFixed(4);
+            dbgStatus.textContent = "tracking";
+          }
+        } else {
+          faceDetected = false;
+          if (debugVisible) dbgStatus.textContent = "no face";
+        }
+      } catch (err) {
+        // Face detection can occasionally throw on frame timing issues
+      }
+    }
+
+    // ── Camera update: base navigation + head-tracking offset ──
+    function updateCamera() {
+      // Head-tracking offset (local to camera orientation)
+      let headOffsetX = 0;
+      let headOffsetY = 0;
+      let headOffsetZ = 0;
+
+      if (faceDetected) {
+        headOffsetX = -(smoothX - 0.5) * 2.0 * sensitivity;
+        headOffsetY = -(smoothY - 0.5) * 2.0 * sensitivity;
+        headOffsetZ = (smoothZ - 1.0) * zSensitivity; // deviation from baseline distance
+      }
+
+      // Apply base rotation
+      const quat = new THREE.Quaternion().setFromEuler(baseEuler);
+
+      // Head offset in camera-local space, transformed to world space
+      const localOffset = new THREE.Vector3(headOffsetX, headOffsetY, headOffsetZ);
+      localOffset.applyQuaternion(quat);
+
+      // Final camera position = base + head offset
+      camera.position.copy(basePosition).add(localOffset);
+      camera.quaternion.copy(quat);
+
+      // Off-axis projection for parallax effect
+      if (faceDetected) {
+        const aspect = window.innerWidth / window.innerHeight;
+        const fovRad = (fov * Math.PI) / 180;
+        const halfH = near * Math.tan(fovRad / 2);
+        const halfW = halfH * aspect;
+
+        // Shift frustum based on head offset (creates the "window" illusion)
+        const shiftX = (headOffsetX * near) / Math.max(Math.abs(headOffsetZ + 3.0), 0.5);
+        const shiftY = (headOffsetY * near) / Math.max(Math.abs(headOffsetZ + 3.0), 0.5);
+
+        camera.projectionMatrix.makePerspective(
+          -halfW + shiftX,
+           halfW + shiftX,
+           halfH + shiftY,
+          -halfH + shiftY,
+          near,
+          far
+        );
+        camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+      } else {
+        // Standard projection when no face detected
+        camera.fov = fov;
+        camera.updateProjectionMatrix();
+      }
+    }
+
+    // ── Animation loop ──
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Delta time for frame-rate-independent movement
+      const now2 = performance.now();
+      const dt = Math.min((now2 - lastFrameTime) / 1000, 0.1); // cap at 100ms
+      lastFrameTime = now2;
+
+      updateMovement(dt);
+      detectFace();
+      updateCamera();
+      renderer.render(scene, camera);
+
+      frameCount++;
+      const now = performance.now();
+      if (now - lastFpsTime >= 1000) {
+        if (debugVisible) dbgFps.textContent = frameCount;
+        frameCount = 0;
+        lastFpsTime = now;
+      }
+    }
+
+    // ── Resize handler ──
+    window.addEventListener("resize", () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    });
+
+    // ── Init ──
+    async function init() {
+      try {
+        // Init face detection first (heavier download), then webcam
+        setDbgStatus("starting...");
+        await initFaceDetection();
+        await initWebcam();
+
+        // Determine which splat to load: query param > last model > default
+        loadingText.textContent = "Loading gaussian splat...";
+        setDbgStatus("loading splat...");
+
+        const params = new URLSearchParams(window.location.search);
+        const paramUrl = params.get("url");
+        const paramName = params.get("name");
+        let loaded = false;
+
+        // 1. Query param takes priority
+        if (paramUrl) {
+          const name = paramName || paramUrl.split("/").pop() || "remote.spz";
+          await loadSplatURL(paramUrl, name, paramUrl);
+          loaded = true;
+        }
+
+        // 2. Try last viewed model
+        if (!loaded) {
+          const lastModel = getLastModel();
+          if (lastModel) {
+            if (lastModel.url) {
+              await loadSplatURL(lastModel.url, lastModel.name, lastModel.url);
+              loaded = true;
+            } else {
+              const cached = await getCachedSplat(lastModel.name);
+              if (cached) {
+                const blob = cached instanceof Blob ? cached : new Blob([cached]);
+                const blobUrl = URL.createObjectURL(blob);
+                await loadSplatURL(blobUrl, lastModel.name, null);
+                loaded = true;
+                showStatus(`Restored: ${lastModel.name}`);
+              }
+            }
+          }
+        }
+
+        // 3. Fallback to default butterfly
+        if (!loaded) {
+          await loadSplatURL("https://sparkjs.dev/assets/splats/butterfly.spz", "butterfly.spz", "https://sparkjs.dev/assets/splats/butterfly.spz");
+        }
+        setDbgStatus("running");
+
+        // Start render loop
+        animate();
+      } catch (err) {
+        console.error("Init failed:", err);
+        loadingText.textContent = `Error: ${err.message}`;
+        setDbgStatus("error: " + err.message);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
