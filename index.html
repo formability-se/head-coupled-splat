@@ -1017,10 +1017,23 @@
     // ── Init ──
     async function init() {
       try {
-        // Init face detection first (heavier download), then webcam
+        // Try face detection + webcam, but don't block splat loading if they fail.
+        // (No camera, denied permission, insecure context → run without head tracking.)
         setDbgStatus("starting...");
-        await initFaceDetection();
-        await initWebcam();
+        try {
+          await initFaceDetection();
+          await initWebcam();
+        } catch (camErr) {
+          console.warn("Head tracking unavailable:", camErr);
+          const reason = camErr?.name === 'NotAllowedError' ? 'Camera permission denied'
+                       : camErr?.name === 'NotFoundError'  ? 'No camera found'
+                       : 'Camera unavailable';
+          setDbgStatus(`no head tracking: ${reason}`);
+          showStatus(`${reason} — continuing without head tracking`, 4000);
+          // Stop any partially-acquired stream
+          if (webcamStream) { webcamStream.getTracks().forEach(t => t.stop()); webcamStream = null; }
+          faceDetector = null;
+        }
 
         // Determine which splat to load: query param > last model > default
         loadingText.textContent = "Loading gaussian splat...";
