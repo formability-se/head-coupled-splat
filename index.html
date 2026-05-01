@@ -506,7 +506,7 @@
 
   <script type="module">
     import * as THREE from "three";
-    import { SplatMesh } from "@sparkjsdev/spark";
+    import { SplatMesh, SparkRenderer } from "@sparkjsdev/spark";
 
     // ── DOM refs ──
     const canvas = document.getElementById("three-canvas");
@@ -811,6 +811,14 @@
     camera.position.set(0, 0, 3);
 
     scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+
+    // SparkRenderer aggregates all SplatMesh instances each frame. We need
+    // preUpdate:true so visibleGenerators is recollected synchronously inside
+    // onBeforeRender — without it, updates are deferred via setTimeout(1) and
+    // the two render() passes in compare mode reuse a stale visibility set
+    // (resulting in only one splat being drawn on both halves).
+    const sparkRenderer = new SparkRenderer({ renderer, preUpdate: true });
+    scene.add(sparkRenderer);
 
     // ── Current splat reference ──
     let currentSplat = null;
