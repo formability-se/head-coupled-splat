@@ -224,8 +224,15 @@
     }
     #status.visible { opacity: 1; }
 
-    /* File input */
-    #file-input { display: none; }
+    /* File input — off-screen instead of display:none so Chrome on macOS opens picker reliably */
+    #file-input {
+      position: absolute;
+      left: -9999px;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
 
     /* Formability branding overlay */
     #branding {
