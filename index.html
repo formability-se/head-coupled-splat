@@ -772,7 +772,7 @@
     document.getElementById("btn-save-pos").addEventListener("click", savePosition);
     document.getElementById("btn-reset-pos").addEventListener("click", resetPosition);
 
-    async function loadSplatURL(url, modelName, remoteUrl) {
+    async function loadSplatURL(url, modelName, remoteUrl, fileBytes) {
       if (currentSplat) {
         scene.remove(currentSplat);
         currentSplat.dispose?.();
@@ -784,8 +784,11 @@
       if (modelName) currentModelName = modelName;
 
       try {
-        // Pass fileName so SparkJS can infer format when url is a blob: URL (no extension)
-        const splat = new SplatMesh({ url, fileName: modelName });
+        // For local files we pass fileBytes + fileName so SparkJS can infer format
+        // (blob: URLs have no extension, so URL-based inference fails).
+        const splat = fileBytes
+          ? new SplatMesh({ fileBytes, fileName: modelName })
+          : new SplatMesh({ url });
         scene.add(splat);
         currentSplat = splat;
         await new Promise((r) => setTimeout(r, 2000));
@@ -812,10 +815,10 @@
     }
 
     async function loadSplatFile(file) {
-      const url = URL.createObjectURL(file);
+      const fileBytes = await file.arrayBuffer();
       // Cache the file in IndexedDB so we can reload it next session
       cacheSplatFile(file.name, file);
-      loadSplatURL(url, file.name, null);
+      loadSplatURL(null, file.name, null, fileBytes);
       showStatus(`Loading: ${file.name}`);
     }
 
@@ -1070,8 +1073,8 @@
               const cached = await getCachedSplat(lastModel.name);
               if (cached) {
                 const blob = cached instanceof Blob ? cached : new Blob([cached]);
-                const blobUrl = URL.createObjectURL(blob);
-                await loadSplatURL(blobUrl, lastModel.name, null);
+                const fileBytes = await blob.arrayBuffer();
+                await loadSplatURL(null, lastModel.name, null, fileBytes);
                 loaded = true;
                 showStatus(`Restored: ${lastModel.name}`);
               }
