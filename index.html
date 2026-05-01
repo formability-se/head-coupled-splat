@@ -784,7 +784,8 @@
       if (modelName) currentModelName = modelName;
 
       try {
-        const splat = new SplatMesh({ url });
+        // Pass fileName so SparkJS can infer format when url is a blob: URL (no extension)
+        const splat = new SplatMesh({ url, fileName: modelName });
         scene.add(splat);
         currentSplat = splat;
         await new Promise((r) => setTimeout(r, 2000));
