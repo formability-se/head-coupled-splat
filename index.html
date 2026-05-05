@@ -287,6 +287,136 @@
     .divider-label-a { right: 12px; }
     .divider-label-b { left: 12px; }
 
+    /* Labeling panel (left side, only visible in paint mode) */
+    #labeling-panel {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 11; /* above debug overlay if user toggles it */
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(79, 70, 229, 0.3);
+      border-radius: 12px;
+      padding: 14px 16px;
+      width: 300px;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      font-size: 12px;
+      display: none;
+    }
+    /* Visibility is JS-controlled — shown when paint-mode is active OR saved labelings exist for current splat */
+    #labeling-panel h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #818cf8;
+      margin-bottom: 10px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    #labeling-panel h4 {
+      font-size: 11px;
+      font-weight: 600;
+      color: #a0a0a0;
+      margin: 12px 0 6px;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+    #labeling-panel h4:first-child { margin-top: 0; }
+    .saved-list, .trees-list {
+      display: flex; flex-direction: column; gap: 4px;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+    .saved-list .empty, .trees-list .empty {
+      color: #666; font-size: 11px; padding: 6px 4px; font-style: italic;
+    }
+    .saved-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 6px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid #2a2a2e;
+      border-radius: 6px;
+    }
+    .saved-row .saved-name {
+      font-size: 12px; color: #c7d2fe; font-weight: 500;
+      grid-column: 1 / 2;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .saved-row .saved-meta {
+      font-size: 10px; color: #666;
+      grid-column: 1 / 2;
+      grid-row: 2;
+    }
+    .saved-row .btn-mini {
+      grid-row: 1 / 3;
+      padding: 4px 8px;
+      background: rgba(79, 70, 229, 0.15);
+      border: 1px solid rgba(79, 70, 229, 0.3);
+      border-radius: 4px;
+      color: #c7d2fe;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .saved-row .btn-mini:hover { background: rgba(79, 70, 229, 0.3); }
+    .tree-row {
+      display: grid;
+      grid-template-columns: 28px 1fr 22px 50px 22px;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 4px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid #2a2a2e;
+      border-radius: 6px;
+    }
+    .tree-row .tree-num {
+      font-size: 10px; color: #666; font-variant-numeric: tabular-nums;
+    }
+    .tree-row .tree-name {
+      background: transparent;
+      border: none;
+      color: #e4e4e7;
+      font-size: 11px;
+      font-family: inherit;
+      padding: 2px 4px;
+      min-width: 0;
+    }
+    .tree-row .tree-name:focus { outline: 1px solid rgba(79,70,229,0.5); border-radius: 3px; }
+    .tree-row .tree-swatch {
+      width: 22px; height: 22px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.3);
+      cursor: pointer;
+      padding: 0;
+      background: transparent;
+      -webkit-appearance: none;
+         -moz-appearance: none;
+              appearance: none;
+    }
+    .tree-row .tree-swatch::-webkit-color-swatch-wrapper { padding: 0; border-radius: 3px; }
+    .tree-row .tree-swatch::-webkit-color-swatch { border: none; border-radius: 3px; }
+    .tree-row .tree-swatch::-moz-color-swatch { border: none; border-radius: 3px; }
+    .tree-row .tree-count {
+      font-size: 10px; color: #818cf8; text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .tree-row .tree-del {
+      width: 18px; height: 18px;
+      background: transparent;
+      border: 1px solid rgba(220,38,38,0.4);
+      border-radius: 4px;
+      color: #fca5a5;
+      cursor: pointer;
+      padding: 0;
+      font-size: 12px;
+      line-height: 1;
+      font-family: inherit;
+    }
+    .tree-row .tree-del:hover { background: rgba(220,38,38,0.2); }
+
     /* Tree painting */
     body.paint-mode { cursor: crosshair; }
     body.paint-mode #three-canvas { cursor: crosshair; }
@@ -399,7 +529,7 @@
     <div><span class="label">FPS: </span><span class="value" id="dbg-fps">0</span></div>
     <div><span class="label">Status: </span><span class="value" id="dbg-status">init</span></div>
     <div style="margin-top:8px;border-top:1px solid rgba(79,70,229,0.2);padding-top:8px;font-size:11px;color:#666;">
-      WASD move | Mouse drag rotate<br>
+      WASD move | LMB rotate | MMB pan<br>
       Scroll zoom | Q/E up/down | Shift fast
     </div>
   </div>
@@ -449,12 +579,16 @@
     </div>
 
     <div class="btn-row" style="margin-top:12px;">
+      <button class="btn" id="btn-camera-mode" style="flex:1;" title="Toggle perspective / orthographic projection">Perspective</button>
+    </div>
+    <div class="btn-row" style="margin-top:8px;">
       <button class="btn" id="btn-debug">Debug</button>
       <button class="btn" id="btn-pause">Pause</button>
       <button class="btn" id="btn-load">Load .spz/.ply</button>
     </div>
     <div class="btn-row" style="margin-top:8px;">
       <button class="btn" id="btn-save-pos" style="flex:1;">Save position</button>
+      <button class="btn" id="btn-recenter" title="Frame the splat in view">Recenter</button>
       <button class="btn" id="btn-reset-pos">Reset</button>
     </div>
     <div id="pos-status" style="font-size:10px;color:#666;margin-top:6px;height:14px;"></div>
@@ -564,6 +698,19 @@
   <input type="file" id="file-input" accept=".spz,.ply,.splat,.ksplat,.sogs,.sog" />
   <input type="file" id="file-input-b" accept=".spz,.ply,.splat,.ksplat,.sogs,.sog" />
   <input type="file" id="file-input-cloud" accept=".ply" />
+  <!-- Labeling library + per-tree metadata (visible only in paint mode) -->
+  <div id="labeling-panel">
+    <h3>Labelings</h3>
+    <div id="current-labeling" style="font-size:10px;color:#666;margin-bottom:8px;line-height:1.4;">Editing: <span style="color:#a0a0a0;">unsaved</span></div>
+    <h4>Saved</h4>
+    <div id="saved-list" class="saved-list"></div>
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn" id="btn-save-labeling" style="flex:1;font-size:11px;" title="Save (overwrite if loaded, else prompt for name)">Save</button>
+      <button class="btn" id="btn-save-labeling-as" style="flex:1;font-size:11px;" title="Save as a new entry">Save as new…</button>
+    </div>
+    <h4>Trees (current)</h4>
+    <div id="trees-list" class="trees-list"></div>
+  </div>
 
   <!-- Compare divider (appears in compare mode) -->
   <div id="compare-divider">
@@ -658,13 +805,34 @@
     // Webcam stream ref for cleanup
     let webcamStream = null;
 
-    // ── Manual navigation state ──
-    // Base position/rotation controlled by WASD + mouse
+    // ── Manual navigation state — orbital camera ──
+    // Camera orbits around `cameraTarget`. LMB orbits, MMB pans (target+camera
+    // shift together), wheel dollys, WASD translates target (camera follows).
+    // `basePosition` + `baseEuler` are derived from orbit state each frame —
+    // kept around because the head-tracking + off-axis projection code uses them.
+    const cameraTarget = new THREE.Vector3(0, 0, 0);
+    let cameraDistance = 3;
+    let cameraAzimuth = 0;     // radians, around world +Y
+    let cameraElevation = 0;   // radians, pitch (clamped)
+    const ORBIT_PITCH_LIMIT = Math.PI / 2 - 0.02;
     const basePosition = new THREE.Vector3(0, 0, 3);
-    const baseEuler = new THREE.Euler(0, 0, 0, "YXZ"); // yaw-pitch order
-    const moveSpeed = 3.0;  // units per second
-    const rotateSpeed = 0.003; // radians per pixel
-    const scrollSpeed = 0.5;
+    const baseEuler = new THREE.Euler(0, 0, 0, "YXZ");
+    const moveSpeed = 3.0;
+    const rotateSpeed = 0.005;
+    const panSpeed = 0.0015;   // multiplied by cameraDistance — fast at far, slow at close
+    const _tmpLookMat = new THREE.Matrix4();
+    const _worldUp = new THREE.Vector3(0, 1, 0);
+
+    function syncCameraFromOrbit() {
+      const cosE = Math.cos(cameraElevation);
+      basePosition.set(
+        cameraTarget.x + Math.sin(cameraAzimuth) * cosE * cameraDistance,
+        cameraTarget.y + Math.sin(cameraElevation) * cameraDistance,
+        cameraTarget.z + Math.cos(cameraAzimuth) * cosE * cameraDistance
+      );
+      _tmpLookMat.lookAt(basePosition, cameraTarget, _worldUp);
+      baseEuler.setFromRotationMatrix(_tmpLookMat, "YXZ");
+    }
 
     // Key tracking
     const keysDown = new Set();
@@ -736,6 +904,13 @@
       document.getElementById("controls").classList.toggle("collapsed");
     });
 
+    const camModeBtn = document.getElementById("btn-camera-mode");
+    camModeBtn.addEventListener("click", () => {
+      cameraMode = cameraMode === "perspective" ? "orthographic" : "perspective";
+      camModeBtn.textContent = cameraMode === "perspective" ? "Perspective" : "Orthographic";
+      camModeBtn.classList.toggle("paint-active", cameraMode === "orthographic");
+    });
+
     document.getElementById("btn-debug").addEventListener("click", () => {
       debugVisible = !debugVisible;
       debugEl.classList.toggle("hidden", !debugVisible);
@@ -788,15 +963,19 @@
       paintToggleBtn.textContent = paintMode ? "Exit paint mode" : "Paint trees";
       paintToggleBtn.classList.toggle("paint-active", paintMode);
       document.body.classList.toggle("paint-mode", paintMode);
+      updateLabelingPanelVisibility();
       if (brushSphere) brushSphere.visible = false;
       if (!paintMode) {
         isPainting = false;
         lastBrushHit = null;
+        enterDisplayModeIfApplicable();
       } else {
         if (!splatPositions && currentSplat) {
           setupPaintForSplat(currentSplat).catch(err => console.warn(err));
         }
         refreshPaintLabelUI();
+        refreshSavedListUI();
+        refreshTreesListUI();
       }
     }
 
@@ -896,6 +1075,61 @@
     });
     document.getElementById("btn-clear-cloud").addEventListener("click", clearGeometryCloud);
 
+    // ── Labeling panel handlers ──
+    document.getElementById("btn-save-labeling").addEventListener("click", async () => {
+      if (currentLabelingId) {
+        // Overwrite the loaded labeling silently
+        await saveLabeling(currentLabelingName || "untitled", { overwriteId: currentLabelingId });
+      } else {
+        const name = prompt("Name this labeling:", `${currentModelName} · ${new Date().toISOString().slice(0,10)}`);
+        if (name && name.trim()) await saveLabeling(name.trim());
+      }
+    });
+    document.getElementById("btn-save-labeling-as").addEventListener("click", async () => {
+      const seed = currentLabelingName ? `${currentLabelingName} (copy)` : `${currentModelName} · ${new Date().toISOString().slice(0,10)}`;
+      const name = prompt("Save as new labeling — name:", seed);
+      if (name && name.trim()) await saveLabeling(name.trim());
+    });
+
+    document.getElementById("saved-list").addEventListener("click", async (e) => {
+      const btn = e.target.closest(".btn-mini");
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const act = btn.dataset.act;
+      if (act === "load") await loadLabeling(id);
+      else if (act === "delete") {
+        if (confirm("Delete this labeling?")) await deleteLabeling(id);
+      } else if (act === "rename") {
+        const newName = prompt("New name:");
+        if (newName && newName.trim()) await renameLabeling(id, newName.trim());
+      }
+    });
+
+    // Per-tree edits via event delegation. Each swatch is a real
+    // <input type="color"> so the browser handles its own picker UI — we just
+    // listen for input events and persist the chosen color.
+    const treesList = document.getElementById("trees-list");
+    treesList.addEventListener("input", (e) => {
+      if (e.target.classList.contains("tree-name")) {
+        const lbl = parseInt(e.target.dataset.lbl);
+        const v = e.target.value.trim();
+        if (v) treeNames.set(lbl, v); else treeNames.delete(lbl);
+      } else if (e.target.classList.contains("tree-swatch")) {
+        const lbl = parseInt(e.target.dataset.lbl);
+        treeColors.set(lbl, hexToRgb01(e.target.value));
+        rebuildPaintedOverlay();
+        if (tintEnabled) applyTint();
+        if (lbl === currentLabel) updateBrushColorForMode();
+      }
+    });
+    treesList.addEventListener("click", (e) => {
+      const del = e.target.closest(".tree-del");
+      if (del) {
+        const lbl = parseInt(del.dataset.lbl);
+        if (confirm(`Delete tree #${lbl}? This clears all splats labeled with it.`)) deleteTree(lbl);
+      }
+    });
+
     const flipXCb = document.getElementById("flip-x");
     const flipYCb = document.getElementById("flip-y");
     const flipZCb = document.getElementById("flip-z");
@@ -976,43 +1210,64 @@
     canvas.addEventListener("mousedown", (e) => {
       if (pointerOverUI) return;
       if (paintMode) {
-        // Left-click in paint mode = stamp; right-click = pan-rotate (escape hatch)
+        // Left-click in paint mode = stamp; right-click = rotate (escape hatch)
         if (e.button === 0) {
           isPainting = true;
           applyBrushAtCursor(e.clientX, e.clientY);
           return;
         }
       }
+      // Middle-click triggers browser autoscroll by default — block it.
+      if (e.button === 1) e.preventDefault();
       isDragging = true;
       dragButton = e.button;
       canvas.requestPointerLock?.();
     });
 
     window.addEventListener("mouseup", () => {
+      const wasPainting = isPainting;
       isDragging = false;
       isPainting = false;
       dragButton = -1;
       document.exitPointerLock?.();
+      // Refresh trees list after a paint stroke ends — avoids stomping focus
+      // on the name-input fields during continuous drags.
+      if (wasPainting) refreshTreesListUI();
     });
 
     window.addEventListener("mousemove", (e) => {
       if (!isDragging) return;
       const dx = e.movementX || 0;
       const dy = e.movementY || 0;
-      // Left-click drag or right-click drag: rotate
-      baseEuler.y -= dx * rotateSpeed;
-      baseEuler.x -= dy * rotateSpeed;
-      // Clamp pitch to avoid flipping
-      baseEuler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, baseEuler.x));
+      if (dragButton === 1) {
+        // Middle drag: pan target along view-aligned right/up. Camera follows
+        // because basePosition is derived from target each frame. Pan speed
+        // scales with distance so the on-screen movement feels constant.
+        const right = new THREE.Vector3(1, 0, 0).applyEuler(baseEuler);
+        const up    = new THREE.Vector3(0, 1, 0).applyEuler(baseEuler);
+        const k = panSpeed * cameraDistance;
+        cameraTarget.addScaledVector(right, -dx * k);
+        cameraTarget.addScaledVector(up,     dy * k);
+      } else {
+        // LMB or RMB: orbit around target
+        cameraAzimuth   -= dx * rotateSpeed;
+        cameraElevation -= dy * rotateSpeed;
+        cameraElevation = Math.max(-ORBIT_PITCH_LIMIT, Math.min(ORBIT_PITCH_LIMIT, cameraElevation));
+      }
     });
 
     // Scroll to move forward/backward
     canvas.addEventListener("wheel", (e) => {
       if (pointerOverUI) return;
       e.preventDefault();
-      const dir = new THREE.Vector3(0, 0, -1);
-      dir.applyEuler(baseEuler);
-      basePosition.addScaledVector(dir, -Math.sign(e.deltaY) * scrollSpeed);
+      // Smooth log-scale dolly: factor depends on deltaY magnitude so trackpad
+      // inertia / fast wheel scrolls cover more range per event. 100 deltaY ≈ 1.2x.
+      const factor = Math.pow(1.2, e.deltaY / 100);
+      if (cameraMode === "orthographic") {
+        orthoSize = Math.max(0.01, Math.min(2000, orthoSize * factor));
+      } else {
+        cameraDistance = Math.max(0.02, Math.min(2000, cameraDistance * factor));
+      }
     }, { passive: false });
 
     // Prevent context menu on canvas
@@ -1024,23 +1279,30 @@
       el.addEventListener("pointerleave", () => { pointerOverUI = false; });
     }
 
-    // ── WASD movement update (called per frame) ──
+    // ── WASD movement (per frame) — translates target so camera follows on the orbit
     function updateMovement(dt) {
-      const speed = keysDown.has("ShiftLeft") || keysDown.has("ShiftRight")
+      const speedBase = keysDown.has("ShiftLeft") || keysDown.has("ShiftRight")
         ? moveSpeed * 3.0
         : moveSpeed;
+      // Scale walking speed with distance so it feels right at any zoom
+      const speed = speedBase * Math.max(0.5, Math.min(20, cameraDistance / 5));
 
-      // Build direction vectors from current orientation
+      // Use current view-aligned forward/right (horizontal-only for walking),
+      // world up for vertical
       const forward = new THREE.Vector3(0, 0, -1).applyEuler(baseEuler);
       const right = new THREE.Vector3(1, 0, 0).applyEuler(baseEuler);
-      const up = new THREE.Vector3(0, 1, 0);
+      const fwdH = new THREE.Vector3(forward.x, 0, forward.z);
+      if (fwdH.lengthSq() > 1e-6) fwdH.normalize();
+      const rightH = new THREE.Vector3(right.x, 0, right.z);
+      if (rightH.lengthSq() > 1e-6) rightH.normalize();
+      const up = _worldUp;
 
-      if (keysDown.has("KeyW")) basePosition.addScaledVector(forward, speed * dt);
-      if (keysDown.has("KeyS")) basePosition.addScaledVector(forward, -speed * dt);
-      if (keysDown.has("KeyA")) basePosition.addScaledVector(right, -speed * dt);
-      if (keysDown.has("KeyD")) basePosition.addScaledVector(right, speed * dt);
-      if (keysDown.has("KeyQ") || keysDown.has("Space")) basePosition.addScaledVector(up, speed * dt);
-      if (keysDown.has("KeyE") || keysDown.has("ControlLeft")) basePosition.addScaledVector(up, -speed * dt);
+      if (keysDown.has("KeyW")) cameraTarget.addScaledVector(fwdH, speed * dt);
+      if (keysDown.has("KeyS")) cameraTarget.addScaledVector(fwdH, -speed * dt);
+      if (keysDown.has("KeyA")) cameraTarget.addScaledVector(rightH, -speed * dt);
+      if (keysDown.has("KeyD")) cameraTarget.addScaledVector(rightH, speed * dt);
+      if (keysDown.has("KeyQ") || keysDown.has("Space")) cameraTarget.addScaledVector(up, speed * dt);
+      if (keysDown.has("KeyE") || keysDown.has("ControlLeft")) cameraTarget.addScaledVector(up, -speed * dt);
     }
 
     // Release webcam on page unload
@@ -1073,7 +1335,7 @@
     scene.background = new THREE.Color(0x0a0a0a);
 
     const fov = 60;
-    const near = 0.1;
+    const near = 0.01;
     const far = 500;
     const camera = new THREE.PerspectiveCamera(
       fov,
@@ -1082,6 +1344,22 @@
       far
     );
     camera.position.set(0, 0, 3);
+
+    // Orthographic camera shares world transform with perspective camera but
+    // uses a parallel-projection frustum. Switched on demand via UI toggle.
+    let cameraMode = "perspective";
+    let orthoSize = 5; // half-height of ortho frustum (world units)
+    const orthoCam = new THREE.OrthographicCamera(
+      -orthoSize * (window.innerWidth / window.innerHeight),
+       orthoSize * (window.innerWidth / window.innerHeight),
+       orthoSize,
+      -orthoSize,
+      near,
+      far
+    );
+    function getActiveCamera() {
+      return cameraMode === "orthographic" ? orthoCam : camera;
+    }
 
     scene.add(new THREE.AmbientLight(0xffffff, 1.0));
 
@@ -1129,16 +1407,39 @@
     let tintEnabled = false;
     let tintStrength = 0.5;     // 0=original, 1=full tree color
     let tintIncludeUnlabeled = false; // if false, label=0 splats stay original
+    const treeNames = new Map();   // label → user-given name
+    const treeColors = new Map();  // label → [r,g,b] in 0..1, overrides default palette
+    let currentLabelingId = null;  // ID of the loaded labeling, null if working on a fresh one
+    let currentLabelingName = null;
+    let savedLabelingCount = 0;    // # of saved labelings matching current splat — drives panel visibility
     let targetDebugOverlay = null; // White-dots overlay of paint target (for visual alignment debug)
     let targetDebugVisible = false;
     const TREE_PALETTE_HUES = [0, 30, 60, 120, 180, 210, 270, 330, 15, 45, 75, 150, 195, 240, 300, 350];
 
     function colorForLabel(label) {
       if (label === 0) return new THREE.Color(0.4, 0.4, 0.4);
+      const override = treeColors.get(label);
+      if (override) return new THREE.Color(override[0], override[1], override[2]);
       const hue = TREE_PALETTE_HUES[(label - 1) % TREE_PALETTE_HUES.length] / 360;
       const c = new THREE.Color();
       c.setHSL(hue, 0.85, 0.55);
       return c;
+    }
+
+    function colorToHex(c) {
+      const r = Math.max(0, Math.min(255, c.r * 255 | 0));
+      const g = Math.max(0, Math.min(255, c.g * 255 | 0));
+      const b = Math.max(0, Math.min(255, c.b * 255 | 0));
+      return "#" + r.toString(16).padStart(2, "0") + g.toString(16).padStart(2, "0") + b.toString(16).padStart(2, "0");
+    }
+    function hexToRgb01(hex) {
+      const r = parseInt(hex.slice(1, 3), 16) / 255;
+      const g = parseInt(hex.slice(3, 5), 16) / 255;
+      const b = parseInt(hex.slice(5, 7), 16) / 255;
+      return [r, g, b];
+    }
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
     }
 
     // ── Current splat reference ──
@@ -1153,13 +1454,19 @@
     const LAST_MODEL_KEY = "hcsplat_last_model";
     const DB_NAME = "hcsplat_files";
     const DB_STORE = "splats";
+    const LABELINGS_STORE = "labelings";
+    const DB_VERSION = 2;
     const posStatusEl = document.getElementById("pos-status");
 
-    // ── IndexedDB for caching loaded splat files ──
+    // ── IndexedDB: caches loaded splat files + saved labelings ──
     function openDB() {
       return new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, 1);
-        req.onupgradeneeded = () => req.result.createObjectStore(DB_STORE);
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
+          if (!db.objectStoreNames.contains(LABELINGS_STORE)) db.createObjectStore(LABELINGS_STORE, { keyPath: "id" });
+        };
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
       });
@@ -1197,8 +1504,9 @@
 
     function savePosition() {
       const data = {
-        px: basePosition.x, py: basePosition.y, pz: basePosition.z,
-        rx: baseEuler.x, ry: baseEuler.y, rz: baseEuler.z,
+        version: 2,
+        tx: cameraTarget.x, ty: cameraTarget.y, tz: cameraTarget.z,
+        dist: cameraDistance, az: cameraAzimuth, el: cameraElevation,
         mrx: modelRotX, mry: modelRotY, mrz: modelRotZ,
       };
       localStorage.setItem(getStorageKey(), JSON.stringify(data));
@@ -1213,13 +1521,26 @@
       if (!raw) return false;
       try {
         const data = JSON.parse(raw);
-        basePosition.set(data.px, data.py, data.pz);
-        baseEuler.set(data.rx, data.ry, data.rz);
-        // Restore model rotation if saved
+        if (data.version === 2 || data.tx !== undefined) {
+          // Orbit format
+          cameraTarget.set(data.tx, data.ty, data.tz);
+          cameraDistance = data.dist;
+          cameraAzimuth = data.az;
+          cameraElevation = data.el;
+        } else {
+          // Legacy format (basePosition + baseEuler) — derive orbit state.
+          // Place target 3 units in front of saved camera position.
+          const oldEuler = new THREE.Euler(data.rx, data.ry, data.rz, "YXZ");
+          const fwd = new THREE.Vector3(0, 0, -1).applyEuler(oldEuler);
+          cameraTarget.set(data.px + fwd.x * 3, data.py + fwd.y * 3, data.pz + fwd.z * 3);
+          cameraDistance = 3;
+          cameraAzimuth = data.ry || 0;
+          cameraElevation = Math.max(-ORBIT_PITCH_LIMIT, Math.min(ORBIT_PITCH_LIMIT, data.rx || 0));
+        }
         if (data.mrx !== undefined) {
           setModelRotationSliders(data.mrx, data.mry, data.mrz);
         }
-        posStatusEl.textContent = `Restored position + rotation`;
+        posStatusEl.textContent = `Restored position`;
         posStatusEl.style.color = "#818cf8";
         setTimeout(() => { posStatusEl.textContent = ""; }, 2000);
         return true;
@@ -1227,10 +1548,11 @@
     }
 
     function resetPosition() {
-      basePosition.set(0, 0, 3);
-      baseEuler.set(0, 0, 0);
+      cameraTarget.set(0, 0, 0);
+      cameraDistance = 3;
+      cameraAzimuth = 0;
+      cameraElevation = 0;
       setModelRotationSliders(0, 0, 0);
-      // Also remove from storage
       localStorage.removeItem(getStorageKey());
       posStatusEl.textContent = "Position reset";
       posStatusEl.style.color = "#666";
@@ -1240,6 +1562,59 @@
 
     document.getElementById("btn-save-pos").addEventListener("click", savePosition);
     document.getElementById("btn-reset-pos").addEventListener("click", resetPosition);
+
+    // Recenter: frame the splat in view by computing its world bbox + placing
+    // the camera at a distance such that the splat fits the FOV (with 20% margin).
+    // Doesn't touch saved positions or the model rotation sliders.
+    function recenterCamera() {
+      if (!splatCenters || splatCenters.length === 0) {
+        showStatus("No splat loaded");
+        return;
+      }
+      // Local bbox
+      let minX = Infinity, minY = Infinity, minZ = Infinity;
+      let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+      for (let i = 0; i < splatCenters.length; i += 3) {
+        const x = splatCenters[i], y = splatCenters[i + 1], z = splatCenters[i + 2];
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+        if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+      }
+      // Transform 8 bbox corners to world to get a tight world AABB even when
+      // the splat has model rotation (e.g. Pitch=180). Using just the diagonal
+      // radius overestimates fit distance heavily on tall/wide forest scenes.
+      const m = (currentSplat && (currentSplat.updateMatrixWorld(), currentSplat.matrixWorld)) || null;
+      const xs = [minX, maxX], ys = [minY, maxY], zs = [minZ, maxZ];
+      let wMinX = Infinity, wMinY = Infinity, wMinZ = Infinity;
+      let wMaxX = -Infinity, wMaxY = -Infinity, wMaxZ = -Infinity;
+      const v = new THREE.Vector3();
+      for (const x of xs) for (const y of ys) for (const z of zs) {
+        v.set(x, y, z);
+        if (m) v.applyMatrix4(m);
+        if (v.x < wMinX) wMinX = v.x; if (v.x > wMaxX) wMaxX = v.x;
+        if (v.y < wMinY) wMinY = v.y; if (v.y > wMaxY) wMaxY = v.y;
+        if (v.z < wMinZ) wMinZ = v.z; if (v.z > wMaxZ) wMaxZ = v.z;
+      }
+      const wcx = (wMinX + wMaxX) / 2, wcy = (wMinY + wMaxY) / 2, wcz = (wMinZ + wMaxZ) / 2;
+      const wdx = wMaxX - wMinX, wdy = wMaxY - wMinY;
+
+      // Fit both width and height — distance is whichever's larger.
+      const aspect = window.innerWidth / window.innerHeight;
+      const fovY = (fov * Math.PI) / 180;
+      const fovX = 2 * Math.atan(Math.tan(fovY / 2) * aspect);
+      const distY = (wdy / 2) / Math.tan(fovY / 2);
+      const distX = (wdx / 2) / Math.tan(fovX / 2);
+      const distance = Math.max(distX, distY, 1) * 1.1; // 10% margin
+
+      // Set orbit state: target at world center, distance fits, look from +Z
+      cameraTarget.set(wcx, wcy, wcz);
+      cameraDistance = distance;
+      cameraAzimuth = 0;
+      cameraElevation = 0;
+      orthoSize = Math.max(0.5, Math.max(wdy / 2, wdx / (2 * aspect)) * 1.1);
+      showStatus(`Recentered (dist ${distance.toFixed(0)}, bbox ${wdx.toFixed(0)}×${wdy.toFixed(0)})`);
+    }
+    document.getElementById("btn-recenter").addEventListener("click", recenterCamera);
 
     async function loadSplatURL(url, modelName, remoteUrl, fileBytes) {
       if (currentSplat) {
@@ -1277,8 +1652,10 @@
           applyModelRotation();
           showStatus(`Splat loaded — position restored`);
         } else {
-          basePosition.set(0, 0, 3);
-          baseEuler.set(0, 0, 0);
+          cameraTarget.set(0, 0, 0);
+          cameraDistance = 3;
+          cameraAzimuth = 0;
+          cameraElevation = 0;
           setModelRotationSliders(0, 0, 0);
           showStatus("Splat loaded");
         }
@@ -1596,6 +1973,11 @@
       spatialGrid = null;
       currentLabel = 1;
       lastBrushHit = null;
+      treeNames.clear();
+      treeColors.clear();
+      currentLabelingId = null;
+      currentLabelingName = null;
+      updateCurrentLabelingUI();
     }
 
     function teardownPaintAll() {
@@ -1649,6 +2031,8 @@
 
       setPaintTarget(splatCenters, null);
       updateBBoxDiagnostic();
+      refreshSavedListUI();
+      refreshTreesListUI();
 
       // Default grow Y-range to splat's full Y bbox so users with non-standard
       // coords (Y down, large negative values, etc.) don't have growth blocked
@@ -1817,7 +2201,7 @@
       renderer.autoClear = true;
       renderer.setRenderTarget(pickingRT);
       renderer.clear();
-      renderer.render(pickingScene, camera);
+      renderer.render(pickingScene, getActiveCamera());
       renderer.setRenderTarget(prevTarget);
       renderer.autoClear = prevAutoClear;
 
@@ -2011,6 +2395,7 @@
       }
       rebuildPaintedOverlay();
       refreshPaintLabelUI();
+      refreshTreesListUI();
       if (tintEnabled) applyTint();
       setPaintStatus(`Grew ${labels.length} trees → +${assigned.toLocaleString()} splats assigned`, "#86efac");
     }
@@ -2022,6 +2407,7 @@
       }
       rebuildPaintedOverlay();
       refreshPaintLabelUI();
+      refreshTreesListUI();
       if (tintEnabled) applyTint();
       setPaintStatus("Growth cleared, seeds preserved");
     }
@@ -2033,6 +2419,7 @@
       currentLabel = 1;
       rebuildPaintedOverlay();
       refreshPaintLabelUI();
+      refreshTreesListUI();
       if (tintEnabled) applyTint();
       setPaintStatus("All labels cleared");
     }
@@ -2049,6 +2436,7 @@
       }
       rebuildPaintedOverlay();
       refreshPaintLabelUI();
+      refreshTreesListUI();
       if (tintEnabled) applyTint();
       setPaintStatus(`Cleared tree #${currentLabel} (${removed.toLocaleString()} splats)`);
     }
@@ -2339,6 +2727,252 @@
       updateBBoxDiagnostic();
     }
 
+    // ── Labeling library: IndexedDB CRUD + UI rendering ──
+    async function listLabelings() {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(LABELINGS_STORE, "readonly");
+        const req = tx.objectStore(LABELINGS_STORE).getAll();
+        return await new Promise((r, j) => { req.onsuccess = () => r(req.result || []); req.onerror = () => j(req.error); });
+      } catch (e) { console.warn("listLabelings:", e); return []; }
+    }
+
+    async function saveLabeling(name, { overwriteId = null } = {}) {
+      if (!splatLabels) { showStatus("Nothing to save"); return; }
+      const used = new Set();
+      for (let i = 0; i < splatLabels.length; i++) if (splatLabels[i] !== 0) used.add(splatLabels[i]);
+      const tree_meta = {};
+      for (const lbl of used) {
+        const entry = {};
+        if (treeNames.has(lbl)) entry.name = treeNames.get(lbl);
+        if (treeColors.has(lbl)) entry.color = treeColors.get(lbl);
+        tree_meta[lbl] = entry;
+      }
+      const id = overwriteId || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
+      const data = {
+        id,
+        name,
+        splat_source: currentModelName,
+        geom_source: geomSourceName,
+        cloud_perm: geomSourceName ? [...cloudPerm] : null,
+        cloud_signs: geomSourceName ? [...cloudSigns] : null,
+        created: Date.now(),
+        labels: new Uint16Array(splatLabels),
+        stamped: new Uint8Array(stampedMask),
+        used_labels: [...used].sort((a, b) => a - b),
+        tree_meta,
+      };
+      try {
+        const db = await openDB();
+        const tx = db.transaction(LABELINGS_STORE, "readwrite");
+        tx.objectStore(LABELINGS_STORE).put(data);
+        await new Promise((r, j) => { tx.oncomplete = r; tx.onerror = () => j(tx.error); });
+        currentLabelingId = id;
+        currentLabelingName = name;
+        updateCurrentLabelingUI();
+        await refreshSavedListUI();
+        showStatus(overwriteId ? `Updated "${name}"` : `Saved "${name}"`);
+      } catch (e) { console.error(e); showStatus("Save failed: " + e.message); }
+    }
+
+    function updateCurrentLabelingUI() {
+      const el = document.getElementById("current-labeling");
+      if (!el) return;
+      if (currentLabelingId) {
+        el.innerHTML = `Editing: <span style="color:#86efac;">${escapeHtml(currentLabelingName || "(unnamed)")}</span>`;
+      } else {
+        el.innerHTML = `Editing: <span style="color:#a0a0a0;">unsaved</span>`;
+      }
+    }
+
+    async function loadLabeling(id) {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(LABELINGS_STORE, "readonly");
+        const req = tx.objectStore(LABELINGS_STORE).get(id);
+        const data = await new Promise((r, j) => { req.onsuccess = () => r(req.result); req.onerror = () => j(req.error); });
+        if (!data) { showStatus("Not found"); return; }
+
+        if (data.splat_source !== currentModelName) {
+          if (!confirm(`Saved for "${data.splat_source}", current is "${currentModelName}". Load anyway?`)) return;
+        }
+        const wantCloud = !!data.geom_source;
+        const haveCloud = !!geomSourceName;
+        if (wantCloud !== haveCloud) {
+          showStatus(`Mismatch: saved for ${wantCloud ? "cloud" : "splat-centers"}, current is ${haveCloud ? "cloud" : "splat-centers"}`);
+          return;
+        }
+        if (!splatLabels || splatLabels.length !== data.labels.length) {
+          showStatus(`Size mismatch: saved ${data.labels.length} pts, current ${splatLabels?.length || 0}`);
+          return;
+        }
+        splatLabels.set(data.labels);
+        if (data.stamped) stampedMask.set(data.stamped);
+        treeNames.clear();
+        treeColors.clear();
+        for (const [lblStr, meta] of Object.entries(data.tree_meta || {})) {
+          const lbl = parseInt(lblStr);
+          if (meta.name) treeNames.set(lbl, meta.name);
+          if (meta.color) treeColors.set(lbl, meta.color);
+        }
+        currentLabelingId = data.id;
+        currentLabelingName = data.name;
+        updateCurrentLabelingUI();
+        rebuildPaintedOverlay();
+        refreshPaintLabelUI();
+        refreshTreesListUI();
+        if (tintEnabled) applyTint();
+        enterDisplayModeIfApplicable();
+        showStatus(`Loaded "${data.name}"`);
+      } catch (e) { console.error(e); showStatus("Load failed: " + e.message); }
+    }
+
+    async function deleteLabeling(id) {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(LABELINGS_STORE, "readwrite");
+        tx.objectStore(LABELINGS_STORE).delete(id);
+        await new Promise((r, j) => { tx.oncomplete = r; tx.onerror = () => j(tx.error); });
+        if (currentLabelingId === id) {
+          currentLabelingId = null;
+          currentLabelingName = null;
+          updateCurrentLabelingUI();
+        }
+        await refreshSavedListUI();
+      } catch (e) { console.error(e); }
+    }
+
+    async function renameLabeling(id, newName) {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(LABELINGS_STORE, "readwrite");
+        const store = tx.objectStore(LABELINGS_STORE);
+        const req = store.get(id);
+        const data = await new Promise((r, j) => { req.onsuccess = () => r(req.result); req.onerror = () => j(req.error); });
+        if (!data) return;
+        data.name = newName;
+        store.put(data);
+        await new Promise((r, j) => { tx.oncomplete = r; tx.onerror = () => j(tx.error); });
+        if (currentLabelingId === id) {
+          currentLabelingName = newName;
+          updateCurrentLabelingUI();
+        }
+        await refreshSavedListUI();
+      } catch (e) { console.error(e); }
+    }
+
+    // Outside paint mode the user is in "view results" mode — force tint on
+    // and hide the points overlay so labeled trees show as tinted splats only.
+    // Inside paint mode the user controls tint manually.
+    function enterDisplayModeIfApplicable() {
+      if (paintMode || !splatLabels) return;
+      let hasLabels = false;
+      for (let i = 0; i < splatLabels.length; i++) {
+        if (splatLabels[i] !== 0) { hasLabels = true; break; }
+      }
+      if (!hasLabels) return;
+      if (!tintEnabled) {
+        tintEnabled = true;
+        const btn = document.getElementById("btn-tint-toggle");
+        if (btn) {
+          btn.classList.add("paint-active");
+          btn.textContent = "Untint splats";
+        }
+        applyTint();
+      }
+      if (paintedOverlay) paintedOverlay.visible = false;
+    }
+
+    function updateLabelingPanelVisibility() {
+      const panel = document.getElementById("labeling-panel");
+      if (!panel) return;
+      panel.style.display = (paintMode || savedLabelingCount > 0) ? "block" : "none";
+    }
+
+    async function refreshSavedListUI() {
+      const list = document.getElementById("saved-list");
+      if (!list) return;
+      const all = await listLabelings();
+      const matches = all.filter(l => l.splat_source === currentModelName);
+      savedLabelingCount = matches.length;
+      updateLabelingPanelVisibility();
+      list.innerHTML = "";
+      if (matches.length === 0) {
+        list.innerHTML = '<div class="empty">No saved labelings for this splat</div>';
+        return;
+      }
+      matches.sort((a, b) => b.created - a.created);
+      for (const lab of matches) {
+        const treeCount = (lab.used_labels || []).length;
+        const dateStr = new Date(lab.created).toISOString().slice(0, 10);
+        const isLoaded = lab.id === currentLabelingId;
+        const row = document.createElement("div");
+        row.className = "saved-row";
+        if (isLoaded) row.style.borderColor = "rgba(134,239,172,0.5)";
+        row.innerHTML = `
+          <span class="saved-name">${isLoaded ? "● " : ""}${escapeHtml(lab.name)}</span>
+          <button class="btn-mini" data-act="load" data-id="${lab.id}" title="Load">▶</button>
+          <button class="btn-mini" data-act="rename" data-id="${lab.id}" title="Rename">✏</button>
+          <button class="btn-mini" data-act="delete" data-id="${lab.id}" title="Delete">×</button>
+          <span class="saved-meta">${treeCount} trees · ${dateStr}</span>
+        `;
+        list.appendChild(row);
+      }
+    }
+
+    function refreshTreesListUI() {
+      const list = document.getElementById("trees-list");
+      if (!list) return;
+      if (!splatLabels) {
+        list.innerHTML = '<div class="empty">No splat loaded</div>';
+        return;
+      }
+      const counts = new Map();
+      for (let i = 0; i < splatLabels.length; i++) {
+        const l = splatLabels[i];
+        if (l !== 0) counts.set(l, (counts.get(l) || 0) + 1);
+      }
+      if (counts.size === 0) {
+        list.innerHTML = '<div class="empty">No trees yet — paint trunks to start</div>';
+        return;
+      }
+      const labels = [...counts.keys()].sort((a, b) => a - b);
+      list.innerHTML = "";
+      for (const lbl of labels) {
+        const hex = colorToHex(colorForLabel(lbl));
+        const name = treeNames.get(lbl) || "";
+        const row = document.createElement("div");
+        row.className = "tree-row";
+        row.innerHTML = `
+          <span class="tree-num">#${lbl}</span>
+          <input type="text" class="tree-name" data-lbl="${lbl}" value="${escapeHtml(name)}" placeholder="(unnamed)" />
+          <input type="color" class="tree-swatch" data-lbl="${lbl}" value="${hex}" title="Change color" />
+          <span class="tree-count">${counts.get(lbl).toLocaleString()}</span>
+          <button class="tree-del" data-lbl="${lbl}" title="Delete tree">×</button>
+        `;
+        list.appendChild(row);
+      }
+    }
+
+    function deleteTree(lbl) {
+      if (!splatLabels) return;
+      let removed = 0;
+      for (let i = 0; i < splatLabels.length; i++) {
+        if (splatLabels[i] === lbl) {
+          splatLabels[i] = 0;
+          stampedMask[i] = 0;
+          removed++;
+        }
+      }
+      treeNames.delete(lbl);
+      treeColors.delete(lbl);
+      rebuildPaintedOverlay();
+      refreshPaintLabelUI();
+      refreshTreesListUI();
+      if (tintEnabled) applyTint();
+      setPaintStatus(`Deleted tree #${lbl} (${removed.toLocaleString()} splats)`);
+    }
+
     async function loadGeometryCloud(file) {
       if (!currentSplat || !splatCenters) {
         setPaintStatus("Load a splat first", "#dc2626");
@@ -2554,6 +3188,11 @@
 
     // ── Camera update: base navigation + head-tracking offset ──
     function updateCamera() {
+      // Refresh basePosition + baseEuler from current orbit state (target,
+      // distance, azimuth, elevation). Everything below treats them the same
+      // as before — head offset is layered on top.
+      syncCameraFromOrbit();
+
       // Head-tracking offset (local to camera orientation)
       let headOffsetX = 0;
       let headOffsetY = 0;
@@ -2572,32 +3211,40 @@
       const localOffset = new THREE.Vector3(headOffsetX, headOffsetY, headOffsetZ);
       localOffset.applyQuaternion(quat);
 
-      // Final camera position = base + head offset
+      // Final camera position = base + head offset (applied to both cameras)
       camera.position.copy(basePosition).add(localOffset);
       camera.quaternion.copy(quat);
+      orthoCam.position.copy(camera.position);
+      orthoCam.quaternion.copy(camera.quaternion);
 
-      // Off-axis projection for parallax effect
-      if (faceDetected) {
-        const aspect = window.innerWidth / window.innerHeight;
+      const aspect = window.innerWidth / window.innerHeight;
+
+      if (cameraMode === "orthographic") {
+        // Ortho frustum sized by orthoSize (wheel adjusts). Head-tracking is
+        // a frustum lateral shift — preserves "window" illusion in parallel projection.
+        let l = -orthoSize * aspect, r = orthoSize * aspect;
+        let t = orthoSize, b = -orthoSize;
+        if (faceDetected) {
+          const sx = headOffsetX * orthoSize * 0.5;
+          const sy = headOffsetY * orthoSize * 0.5;
+          l += sx; r += sx; t += sy; b += sy;
+        }
+        orthoCam.left = l; orthoCam.right = r; orthoCam.top = t; orthoCam.bottom = b;
+        orthoCam.near = near; orthoCam.far = far;
+        orthoCam.updateProjectionMatrix();
+      } else if (faceDetected) {
         const fovRad = (fov * Math.PI) / 180;
         const halfH = near * Math.tan(fovRad / 2);
         const halfW = halfH * aspect;
-
-        // Shift frustum based on head offset (creates the "window" illusion)
         const shiftX = (headOffsetX * near) / Math.max(Math.abs(headOffsetZ + 3.0), 0.5);
         const shiftY = (headOffsetY * near) / Math.max(Math.abs(headOffsetZ + 3.0), 0.5);
-
         camera.projectionMatrix.makePerspective(
-          -halfW + shiftX,
-           halfW + shiftX,
-           halfH + shiftY,
-          -halfH + shiftY,
-          near,
-          far
+          -halfW + shiftX, halfW + shiftX,
+           halfH + shiftY, -halfH + shiftY,
+          near, far
         );
         camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
       } else {
-        // Standard projection when no face detected
         camera.fov = fov;
         camera.updateProjectionMatrix();
       }
@@ -2616,6 +3263,7 @@
       detectFace();
       updateCamera();
 
+      const activeCam = getActiveCamera();
       if (compareMode && currentSplat && currentSplatB) {
         // Side-by-side comparison via WebGL scissor test.
         // Both splats share the same scene + camera; we toggle visibility per pass.
@@ -2627,27 +3275,24 @@
         renderer.autoClear = false;
         renderer.setScissorTest(true);
 
-        // Left half: splat A
         currentSplat.visible = true;
         currentSplatB.visible = false;
         renderer.setScissor(0, 0, splitPx, h);
         renderer.clear();
-        renderer.render(scene, camera);
+        renderer.render(scene, activeCam);
 
-        // Right half: splat B
         currentSplat.visible = false;
         currentSplatB.visible = true;
         renderer.setScissor(splitPx, 0, w - splitPx, h);
         renderer.clear();
-        renderer.render(scene, camera);
+        renderer.render(scene, activeCam);
 
         renderer.setScissorTest(false);
         renderer.autoClear = true;
-        // Restore for any non-render code that inspects visibility
         currentSplat.visible = true;
         currentSplatB.visible = true;
       } else {
-        renderer.render(scene, camera);
+        renderer.render(scene, activeCam);
       }
 
       frameCount++;
@@ -2662,8 +3307,14 @@
     // ── Resize handler ──
     window.addEventListener("resize", () => {
       renderer.setSize(window.innerWidth, window.innerHeight);
-      camera.aspect = window.innerWidth / window.innerHeight;
+      const aspect = window.innerWidth / window.innerHeight;
+      camera.aspect = aspect;
       camera.updateProjectionMatrix();
+      orthoCam.left = -orthoSize * aspect;
+      orthoCam.right = orthoSize * aspect;
+      orthoCam.top = orthoSize;
+      orthoCam.bottom = -orthoSize;
+      orthoCam.updateProjectionMatrix();
     });
 
     // ── Init ──
