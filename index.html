@@ -518,6 +518,7 @@
 
         <div class="btn-row" style="margin-top:10px;">
           <button class="btn" id="btn-new-tree" style="flex:1;">New tree</button>
+          <button class="btn" id="btn-eraser" title="Toggle eraser — paint to remove labels">Eraser</button>
           <button class="btn" id="btn-undo-tree" title="Clear current tree">Clear #</button>
         </div>
         <div class="control-row" style="margin-top:6px;margin-bottom:4px;">
@@ -537,6 +538,15 @@
           <button class="btn" id="btn-grow" style="flex:1;">Grow</button>
           <button class="btn" id="btn-clear-grow" title="Reset growth">Reset grow</button>
         </div>
+        <div class="btn-row" style="margin-top:6px;">
+          <button class="btn" id="btn-tint-toggle" style="flex:1;" title="Apply tree colors as a tint to the actual splats (50% blend with original)">Tint splats</button>
+        </div>
+        <div class="control-row" style="margin-top:4px;margin-bottom:2px;">
+          <label>Tint strength</label>
+          <span class="val" id="tint-strength-val">0.50</span>
+        </div>
+        <input type="range" id="tint-strength" min="0.05" max="1.0" step="0.05" value="0.5" />
+
         <div class="btn-row" style="margin-top:6px;">
           <button class="btn" id="btn-export-labels" style="flex:1;">Export labels</button>
           <button class="btn" id="btn-clear-all">Clear all</button>
@@ -602,7 +612,7 @@
 
   <script type="module">
     import * as THREE from "three";
-    import { SplatMesh, SparkRenderer } from "@sparkjsdev/spark";
+    import { SplatMesh, SparkRenderer, RgbaArray } from "@sparkjsdev/spark";
 
     // ── DOM refs ──
     const canvas = document.getElementById("three-canvas");
@@ -810,8 +820,25 @@
       while (used.has(next)) next++;
       currentLabel = next;
       refreshPaintLabelUI();
-      if (brushSphere) brushSphere.material.color.copy(colorForLabel(currentLabel));
+      updateBrushColorForMode();
       setPaintStatus(`Painting tree #${currentLabel}`);
+    });
+
+    const eraserBtn = document.getElementById("btn-eraser");
+    function updateBrushColorForMode() {
+      if (!brushSphere) return;
+      if (eraseMode) {
+        brushSphere.material.color.setHex(0xffffff);
+      } else {
+        brushSphere.material.color.copy(colorForLabel(currentLabel));
+      }
+    }
+    eraserBtn.addEventListener("click", () => {
+      eraseMode = !eraseMode;
+      eraserBtn.classList.toggle("paint-active", eraseMode);
+      eraserBtn.textContent = eraseMode ? "Painting" : "Eraser";
+      updateBrushColorForMode();
+      setPaintStatus(eraseMode ? "Eraser ON — paint over to remove labels" : "Painting tree #" + currentLabel);
     });
 
     document.getElementById("btn-undo-tree").addEventListener("click", clearCurrentTree);
@@ -840,6 +867,25 @@
     document.getElementById("btn-clear-grow").addEventListener("click", clearGrowth);
     document.getElementById("btn-clear-all").addEventListener("click", clearAllPaint);
     document.getElementById("btn-export-labels").addEventListener("click", exportLabels);
+
+    const tintBtn = document.getElementById("btn-tint-toggle");
+    tintBtn.addEventListener("click", () => {
+      tintEnabled = !tintEnabled;
+      tintBtn.classList.toggle("paint-active", tintEnabled);
+      tintBtn.textContent = tintEnabled ? "Untint splats" : "Tint splats";
+      applyTint();
+      // Hide the labeled-points overlay while tint is on — otherwise the
+      // colored dots cover the underlying splat-tint, making it look like
+      // the tint isn't applied.
+      if (paintedOverlay) paintedOverlay.visible = !tintEnabled;
+    });
+    const tintStrengthSlider = document.getElementById("tint-strength");
+    const tintStrengthVal = document.getElementById("tint-strength-val");
+    tintStrengthSlider.addEventListener("input", () => {
+      tintStrength = parseFloat(tintStrengthSlider.value);
+      tintStrengthVal.textContent = tintStrength.toFixed(2);
+      if (tintEnabled) applyTint();
+    });
 
     const fileInputCloud = document.getElementById("file-input-cloud");
     document.getElementById("btn-load-cloud").addEventListener("click", () => fileInputCloud.click());
@@ -1060,6 +1106,7 @@
     let currentLabel = 1;         // 1-indexed; 0 reserved for "unpainted"
     let paintMode = false;
     let isPainting = false;
+    let eraseMode = false;
     let brushRadiusM = 0.5;       // world units (≈ meters if splat unit ≈ 1m)
     let pickingScene = null;
     let pickingPoints = null;
@@ -1078,6 +1125,10 @@
     let cloudSigns = [1, 1, 1];
     let growMaxR = 2.5;
     let growYMin = -Infinity, growYMax = Infinity;
+    let splatRgba = null;       // SparkJS per-splat color override (RgbaArray)
+    let tintEnabled = false;
+    let tintStrength = 0.5;     // 0=original, 1=full tree color
+    let tintIncludeUnlabeled = false; // if false, label=0 splats stay original
     let targetDebugOverlay = null; // White-dots overlay of paint target (for visual alignment debug)
     let targetDebugVisible = false;
     const TREE_PALETTE_HUES = [0, 30, 60, 120, 180, 210, 270, 330, 15, 45, 75, 150, 195, 240, 300, 350];
@@ -1551,6 +1602,15 @@
       teardownPaintTarget();
       splatCenters = null;
       geomSourceName = null;
+      // Drop the SparkJS RgbaArray override and reset toggle state
+      if (currentSplat) currentSplat.splatRgba = null;
+      splatRgba = null;
+      tintEnabled = false;
+      const btn = document.getElementById("btn-tint-toggle");
+      if (btn) {
+        btn.classList.remove("paint-active");
+        btn.textContent = "Tint splats";
+      }
       updateCloudStatusUI();
     }
 
@@ -1810,14 +1870,24 @@
       const r2 = brushRadiusM * brushRadiusM;
       const cx = localCenter.x, cy = localCenter.y, cz = localCenter.z;
       let stamped = 0;
+      const erase = eraseMode;
       const visit = (i) => {
         const dx = splatPositions[i * 3]     - cx;
         const dy = splatPositions[i * 3 + 1] - cy;
         const dz = splatPositions[i * 3 + 2] - cz;
         if (dx * dx + dy * dy + dz * dz <= r2) {
-          splatLabels[i] = currentLabel;
-          stampedMask[i] = 1;
-          stamped++;
+          if (erase) {
+            // Clear regardless of label — handles both grown and stamped points
+            if (splatLabels[i] !== 0 || stampedMask[i] !== 0) {
+              splatLabels[i] = 0;
+              stampedMask[i] = 0;
+              stamped++;
+            }
+          } else {
+            splatLabels[i] = currentLabel;
+            stampedMask[i] = 1;
+            stamped++;
+          }
         }
       };
       if (spatialGrid) {
@@ -1941,6 +2011,7 @@
       }
       rebuildPaintedOverlay();
       refreshPaintLabelUI();
+      if (tintEnabled) applyTint();
       setPaintStatus(`Grew ${labels.length} trees → +${assigned.toLocaleString()} splats assigned`, "#86efac");
     }
 
@@ -1951,6 +2022,7 @@
       }
       rebuildPaintedOverlay();
       refreshPaintLabelUI();
+      if (tintEnabled) applyTint();
       setPaintStatus("Growth cleared, seeds preserved");
     }
 
@@ -1961,6 +2033,7 @@
       currentLabel = 1;
       rebuildPaintedOverlay();
       refreshPaintLabelUI();
+      if (tintEnabled) applyTint();
       setPaintStatus("All labels cleared");
     }
 
@@ -1976,6 +2049,7 @@
       }
       rebuildPaintedOverlay();
       refreshPaintLabelUI();
+      if (tintEnabled) applyTint();
       setPaintStatus(`Cleared tree #${currentLabel} (${removed.toLocaleString()} splats)`);
     }
 
@@ -2012,6 +2086,78 @@
         out[i] = best;
       }
       return out;
+    }
+
+    // Apply per-tree color as a tint to the actual splats via SparkJS RgbaArray.
+    // Doesn't modify packed splat data — splat.splatRgba is a per-splat color
+    // override that GPU samples by index. Setting null fully restores.
+    function applyTint() {
+      if (!currentSplat || !splatCenters) return;
+      if (!tintEnabled) {
+        const hadOverride = currentSplat.splatRgba != null;
+        currentSplat.splatRgba = null;
+        if (hadOverride && typeof currentSplat.updateGenerator === "function") {
+          currentSplat.updateGenerator();
+        }
+        return;
+      }
+      // Per-splat labels: direct if paint target IS splat centers, else project from cloud.
+      let splatLbls;
+      if (geomSourceName) {
+        splatLbls = projectLabelsToSplatCenters();
+        if (!splatLbls) { setPaintStatus("Project failed", "#dc2626"); return; }
+      } else {
+        splatLbls = splatLabels;
+      }
+      const N = currentSplat.packedSplats.numSplats;
+      if (!splatRgba) {
+        splatRgba = new RgbaArray({ capacity: N });
+      }
+      splatRgba.ensureCapacity(N);
+      splatRgba.count = N;
+      const arr = splatRgba.array;
+      const k = tintStrength;
+      const k1 = 1 - k;
+      // Cache color objects for labels we encounter to avoid per-splat HSL math
+      const lblCache = new Map();
+      lblCache.set(0, null);
+      currentSplat.forEachSplat((i, _c, _s, _q, opacity, color) => {
+        const lbl = splatLbls[i] | 0;
+        let r = color.r, g = color.g, b = color.b;
+        if (lbl !== 0) {
+          let tc = lblCache.get(lbl);
+          if (tc === undefined) {
+            const c = colorForLabel(lbl);
+            tc = { r: c.r, g: c.g, b: c.b };
+            lblCache.set(lbl, tc);
+          }
+          r = k1 * r + k * tc.r;
+          g = k1 * g + k * tc.g;
+          b = k1 * b + k * tc.b;
+        }
+        const o = i * 4;
+        arr[o]     = (r * 255) | 0;
+        arr[o + 1] = (g * 255) | 0;
+        arr[o + 2] = (b * 255) | 0;
+        arr[o + 3] = (opacity * 255) | 0;
+      });
+      splatRgba.needsUpdate = true;
+      // Force lazy source-texture allocation/upload — the dyno's update closure
+      // reads this.source directly, so without an explicit getTexture() call
+      // the GPU keeps sampling SparkJS's empty fallback texture.
+      if (typeof splatRgba.getTexture === "function") {
+        splatRgba.getTexture();
+      } else if (typeof splatRgba.maybeUpdateSource === "function") {
+        splatRgba.maybeUpdateSource();
+      }
+      const wasNull = currentSplat.splatRgba == null;
+      currentSplat.splatRgba = splatRgba;
+      // SparkJS dyno graph (built in constructGenerator) embeds an `if(splatRgba)`
+      // branch — once at construct time. Toggling splatRgba between null and
+      // non-null requires re-running constructGenerator via updateGenerator().
+      if (wasNull && typeof currentSplat.updateGenerator === "function") {
+        currentSplat.updateGenerator();
+      }
     }
 
     function exportLabels() {
