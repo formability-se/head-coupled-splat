@@ -226,7 +226,8 @@
 
     /* File inputs — off-screen instead of display:none so Chrome on macOS opens picker reliably */
     #file-input,
-    #file-input-b {
+    #file-input-b,
+    #file-input-cloud {
       position: absolute;
       left: -9999px;
       width: 1px;
@@ -285,6 +286,30 @@
     }
     .divider-label-a { right: 12px; }
     .divider-label-b { left: 12px; }
+
+    /* Tree painting */
+    body.paint-mode { cursor: crosshair; }
+    body.paint-mode #three-canvas { cursor: crosshair; }
+    .paint-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 3px 8px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(79, 70, 229, 0.3);
+      border-radius: 999px;
+      font-size: 11px;
+      color: #c7d2fe;
+      font-variant-numeric: tabular-nums;
+    }
+    .paint-pill .swatch {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+    .btn.paint-active {
+      background: rgba(220, 38, 38, 0.25);
+      border-color: rgba(220, 38, 38, 0.6);
+      color: #fecaca;
+    }
 
     /* Formability branding overlay */
     #branding {
@@ -453,11 +478,82 @@
         <button class="btn" id="btn-exit-compare" style="margin-top:8px;width:100%;">Exit compare</button>
       </div>
     </div>
+
+    <!-- Tree painting -->
+    <div style="margin-top:14px;border-top:1px solid #2a2a2e;padding-top:12px;">
+      <button class="btn" id="btn-paint-toggle" style="width:100%;">Paint trees</button>
+      <div id="paint-controls" style="display:none;margin-top:10px;">
+        <div class="btn-row" style="margin-top:0;">
+          <button class="btn" id="btn-load-cloud" style="flex:1;font-size:11px;">Load geometry .ply</button>
+          <button class="btn" id="btn-clear-cloud" title="Revert to splat centers" style="font-size:11px;">×</button>
+        </div>
+        <div id="cloud-status" style="font-size:10px;color:#666;margin:4px 0 4px;line-height:1.4;">
+          Source: splat centers
+        </div>
+        <div id="cloud-bbox" style="font-size:10px;color:#555;margin-bottom:6px;line-height:1.3;font-family:monospace;"></div>
+        <div style="display:flex;gap:8px;align-items:center;font-size:11px;color:#a0a0a0;margin-bottom:8px;">
+          <span>Flip:</span>
+          <label style="display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="checkbox" id="flip-x" style="margin:0;">X</label>
+          <label style="display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="checkbox" id="flip-y" style="margin:0;">Y</label>
+          <label style="display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="checkbox" id="flip-z" style="margin:0;">Z</label>
+          <button class="btn" id="btn-cv-preset" title="OpenCV→OpenGL: flip Y & Z" style="margin-left:auto;padding:3px 8px;font-size:10px;">CV→GL</button>
+        </div>
+        <div class="btn-row" style="margin-top:0;margin-bottom:6px;">
+          <button class="btn" id="btn-auto-align" title="Match cloud bbox to splat bbox: figures out axis swaps + sign flips" style="flex:1;font-size:11px;">Auto-align cloud to splat</button>
+        </div>
+        <div class="btn-row" style="margin-top:0;margin-bottom:8px;">
+          <button class="btn" id="btn-show-points" title="Render paint-target as white dots — debug alignment" style="flex:1;font-size:11px;">Show points overlay</button>
+        </div>
+
+        <div class="control-row" style="margin-bottom:6px;">
+          <label>Brush radius (m)</label>
+          <span class="val" id="brush-val">0.5</span>
+        </div>
+        <input type="range" id="brush-radius" min="0.05" max="3.0" step="0.05" value="0.5" />
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;gap:6px;">
+          <span class="paint-pill"><span class="swatch" id="paint-swatch"></span><span>Tree #<span id="paint-label">1</span></span></span>
+          <span class="paint-pill" id="paint-stamp-count">0 splats</span>
+        </div>
+
+        <div class="btn-row" style="margin-top:10px;">
+          <button class="btn" id="btn-new-tree" style="flex:1;">New tree</button>
+          <button class="btn" id="btn-undo-tree" title="Clear current tree">Clear #</button>
+        </div>
+        <div class="control-row" style="margin-top:6px;margin-bottom:4px;">
+          <label>Grow radius (m)</label>
+          <span class="val" id="grow-radius-val">2.5</span>
+        </div>
+        <input type="range" id="grow-radius" min="0.5" max="15" step="0.1" value="2.5" />
+
+        <div style="display:flex;gap:6px;align-items:center;font-size:11px;color:#a0a0a0;margin-top:6px;">
+          <span style="white-space:nowrap;">Grow Y:</span>
+          <input type="number" id="grow-ymin" step="1" style="flex:1;min-width:0;background:#0a0a0a;border:1px solid #2a2a2e;border-radius:4px;padding:2px 4px;font-size:11px;color:#e4e4e7;" />
+          <span style="color:#666;">to</span>
+          <input type="number" id="grow-ymax" step="1" style="flex:1;min-width:0;background:#0a0a0a;border:1px solid #2a2a2e;border-radius:4px;padding:2px 4px;font-size:11px;color:#e4e4e7;" />
+        </div>
+
+        <div class="btn-row" style="margin-top:6px;">
+          <button class="btn" id="btn-grow" style="flex:1;">Grow</button>
+          <button class="btn" id="btn-clear-grow" title="Reset growth">Reset grow</button>
+        </div>
+        <div class="btn-row" style="margin-top:6px;">
+          <button class="btn" id="btn-export-labels" style="flex:1;">Export labels</button>
+          <button class="btn" id="btn-clear-all">Clear all</button>
+        </div>
+        <div id="paint-status" style="font-size:10px;color:#666;margin-top:6px;line-height:1.4;min-height:14px;"></div>
+        <div style="font-size:10px;color:#666;margin-top:4px;line-height:1.4;">
+          Click + drag to paint seeds on trunks.<br>
+          Grow expands seeds to full trees via nearest-centroid (x,z).
+        </div>
+      </div>
+    </div>
     </div><!-- .controls-body -->
   </div>
 
   <input type="file" id="file-input" accept=".spz,.ply,.splat,.ksplat,.sogs,.sog" />
   <input type="file" id="file-input-b" accept=".spz,.ply,.splat,.ksplat,.sogs,.sog" />
+  <input type="file" id="file-input-cloud" accept=".ply" />
 
   <!-- Compare divider (appears in compare mode) -->
   <div id="compare-divider">
@@ -670,6 +766,128 @@
     });
     document.getElementById("btn-exit-compare").addEventListener("click", exitCompareMode);
 
+    // ── Paint UI wiring ──
+    const paintToggleBtn = document.getElementById("btn-paint-toggle");
+    const paintControls = document.getElementById("paint-controls");
+    const brushSlider = document.getElementById("brush-radius");
+    const brushVal = document.getElementById("brush-val");
+
+    function setPaintMode(on) {
+      paintMode = !!on;
+      paintControls.style.display = paintMode ? "block" : "none";
+      paintToggleBtn.textContent = paintMode ? "Exit paint mode" : "Paint trees";
+      paintToggleBtn.classList.toggle("paint-active", paintMode);
+      document.body.classList.toggle("paint-mode", paintMode);
+      if (brushSphere) brushSphere.visible = false;
+      if (!paintMode) {
+        isPainting = false;
+        lastBrushHit = null;
+      } else {
+        if (!splatPositions && currentSplat) {
+          setupPaintForSplat(currentSplat).catch(err => console.warn(err));
+        }
+        refreshPaintLabelUI();
+      }
+    }
+
+    paintToggleBtn.addEventListener("click", () => setPaintMode(!paintMode));
+
+    brushSlider.addEventListener("input", () => {
+      brushRadiusM = parseFloat(brushSlider.value);
+      brushVal.textContent = brushRadiusM.toFixed(2);
+      if (brushSphere) {
+        brushSphere.geometry.dispose();
+        brushSphere.geometry = new THREE.SphereGeometry(brushRadiusM, 24, 16);
+      }
+    });
+
+    document.getElementById("btn-new-tree").addEventListener("click", () => {
+      // Find next unused label
+      if (!splatLabels) { currentLabel++; refreshPaintLabelUI(); return; }
+      const used = new Set();
+      for (let i = 0; i < splatLabels.length; i++) if (splatLabels[i] !== 0) used.add(splatLabels[i]);
+      let next = 1;
+      while (used.has(next)) next++;
+      currentLabel = next;
+      refreshPaintLabelUI();
+      if (brushSphere) brushSphere.material.color.copy(colorForLabel(currentLabel));
+      setPaintStatus(`Painting tree #${currentLabel}`);
+    });
+
+    document.getElementById("btn-undo-tree").addEventListener("click", clearCurrentTree);
+    document.getElementById("btn-grow").addEventListener("click", () => voronoiGrow({
+      maxRadiusM: growMaxR,
+      hMin: growYMin,
+      hMax: growYMax,
+    }));
+
+    const growRadiusSlider = document.getElementById("grow-radius");
+    const growRadiusVal = document.getElementById("grow-radius-val");
+    growRadiusSlider.addEventListener("input", () => {
+      growMaxR = parseFloat(growRadiusSlider.value);
+      growRadiusVal.textContent = growMaxR.toFixed(1);
+    });
+    const growYMinInput = document.getElementById("grow-ymin");
+    const growYMaxInput = document.getElementById("grow-ymax");
+    growYMinInput.addEventListener("change", () => {
+      const v = parseFloat(growYMinInput.value);
+      growYMin = isFinite(v) ? v : -Infinity;
+    });
+    growYMaxInput.addEventListener("change", () => {
+      const v = parseFloat(growYMaxInput.value);
+      growYMax = isFinite(v) ? v : Infinity;
+    });
+    document.getElementById("btn-clear-grow").addEventListener("click", clearGrowth);
+    document.getElementById("btn-clear-all").addEventListener("click", clearAllPaint);
+    document.getElementById("btn-export-labels").addEventListener("click", exportLabels);
+
+    const fileInputCloud = document.getElementById("file-input-cloud");
+    document.getElementById("btn-load-cloud").addEventListener("click", () => fileInputCloud.click());
+    fileInputCloud.addEventListener("change", async (e) => {
+      const f = e.target.files[0];
+      if (f) await loadGeometryCloud(f);
+      fileInputCloud.value = ""; // allow reloading same file
+    });
+    document.getElementById("btn-clear-cloud").addEventListener("click", clearGeometryCloud);
+
+    const flipXCb = document.getElementById("flip-x");
+    const flipYCb = document.getElementById("flip-y");
+    const flipZCb = document.getElementById("flip-z");
+    flipXCb.addEventListener("change", () => { cloudSigns[0] = flipXCb.checked ? -1 : 1; reapplyCloudTransform(); });
+    flipYCb.addEventListener("change", () => { cloudSigns[1] = flipYCb.checked ? -1 : 1; reapplyCloudTransform(); });
+    flipZCb.addEventListener("change", () => { cloudSigns[2] = flipZCb.checked ? -1 : 1; reapplyCloudTransform(); });
+    const showPointsBtn = document.getElementById("btn-show-points");
+    showPointsBtn.addEventListener("click", () => {
+      targetDebugVisible = !targetDebugVisible;
+      showPointsBtn.classList.toggle("paint-active", targetDebugVisible);
+      showPointsBtn.textContent = targetDebugVisible ? "Hide points overlay" : "Show points overlay";
+      if (targetDebugOverlay) targetDebugOverlay.visible = targetDebugVisible;
+    });
+
+    document.getElementById("btn-cv-preset").addEventListener("click", () => {
+      // OpenCV→OpenGL: identity perm + flip Y & Z
+      cloudPerm = [0, 1, 2];
+      cloudSigns = [1, -1, -1];
+      flipXCb.checked = false;
+      flipYCb.checked = true;
+      flipZCb.checked = true;
+      reapplyCloudTransform();
+    });
+    document.getElementById("btn-auto-align").addEventListener("click", autoAlignCloud);
+
+    // Mouse interaction in paint mode (canvas-only; UI-pointer guarded elsewhere)
+    canvas.addEventListener("pointermove", (e) => {
+      if (!paintMode || pointerOverUI) return;
+      if (isPainting) {
+        applyBrushAtCursor(e.clientX, e.clientY);
+      } else {
+        updateBrushFromCursor(e.clientX, e.clientY);
+      }
+    });
+    canvas.addEventListener("pointerleave", () => {
+      if (brushSphere) brushSphere.visible = false;
+    });
+
     // Divider drag
     const compareDivider = document.getElementById("compare-divider");
     compareDivider.addEventListener("pointerdown", (e) => {
@@ -711,6 +929,14 @@
     // ── Mouse drag for rotation ──
     canvas.addEventListener("mousedown", (e) => {
       if (pointerOverUI) return;
+      if (paintMode) {
+        // Left-click in paint mode = stamp; right-click = pan-rotate (escape hatch)
+        if (e.button === 0) {
+          isPainting = true;
+          applyBrushAtCursor(e.clientX, e.clientY);
+          return;
+        }
+      }
       isDragging = true;
       dragButton = e.button;
       canvas.requestPointerLock?.();
@@ -718,6 +944,7 @@
 
     window.addEventListener("mouseup", () => {
       isDragging = false;
+      isPainting = false;
       dragButton = -1;
       document.exitPointerLock?.();
     });
@@ -819,6 +1046,49 @@
     // (resulting in only one splat being drawn on both halves).
     const sparkRenderer = new SparkRenderer({ renderer, preUpdate: true });
     scene.add(sparkRenderer);
+
+    // ── Tree painting state ──
+    // The "paint target" is whatever pointcloud we pick + label. Defaults to
+    // the trained splat's centers (sparse on smooth surfaces) but can be
+    // swapped to a denser geometry pointcloud (e.g. Metashape MVS output) for
+    // better picking + labeling coverage.
+    let splatPositions = null;    // Float32Array(N*3) — paint-target positions (local coords)
+    let splatLabels = null;       // Uint16Array(N) — 0=unpainted, ≥1=tree label
+    let stampedMask = null;       // Uint8Array(N) — 1 if manually stamped (vs Voronoi-grown)
+    let splatCenters = null;      // Float32Array(numSplats*3) — always trained-splat centers, kept for export projection
+    let geomSourceName = null;    // null = using splat centers; else PLY filename
+    let currentLabel = 1;         // 1-indexed; 0 reserved for "unpainted"
+    let paintMode = false;
+    let isPainting = false;
+    let brushRadiusM = 0.5;       // world units (≈ meters if splat unit ≈ 1m)
+    let pickingScene = null;
+    let pickingPoints = null;
+    let pickingRT = null;
+    let pickingIndices = null;    // Uint32Array(K) mapping picking-point-idx → paint-target-idx
+    const PICK_SUBSAMPLE_TARGET = 200000;
+    let paintedOverlay = null;
+    let brushSphere = null;
+    let lastBrushHit = null;
+    let spatialGrid = null;       // {minX, minY, minZ, cellSize, nx, ny, nz, cellOffsets, cellIndices}
+    let rawCloudPositions = null; // Float32Array — unmodified cloud from PLY (kept so flip toggles can re-derive)
+    // Cloud transform: out_axis i = signs[i] * raw_axis perm[i]. Covers all 48
+    // axis permutations + sign flips needed to map a Metashape/CV cloud frame
+    // to the splat's frame (e.g. Z-up → Y-up + Y flip).
+    let cloudPerm = [0, 1, 2];
+    let cloudSigns = [1, 1, 1];
+    let growMaxR = 2.5;
+    let growYMin = -Infinity, growYMax = Infinity;
+    let targetDebugOverlay = null; // White-dots overlay of paint target (for visual alignment debug)
+    let targetDebugVisible = false;
+    const TREE_PALETTE_HUES = [0, 30, 60, 120, 180, 210, 270, 330, 15, 45, 75, 150, 195, 240, 300, 350];
+
+    function colorForLabel(label) {
+      if (label === 0) return new THREE.Color(0.4, 0.4, 0.4);
+      const hue = TREE_PALETTE_HUES[(label - 1) % TREE_PALETTE_HUES.length] / 360;
+      const c = new THREE.Color();
+      c.setHSL(hue, 0.85, 0.55);
+      return c;
+    }
 
     // ── Current splat reference ──
     let currentSplat = null;
@@ -943,6 +1213,9 @@
         loadingEl.classList.add("fade-out");
         setTimeout(() => { loadingEl.style.display = "none"; }, 500);
 
+        // Build CPU-side position mirror + picking infrastructure for tree painting
+        setupPaintForSplat(splat).catch(err => console.warn("Paint setup failed:", err));
+
         // Remember this model
         rememberLastModel(currentModelName, remoteUrl || null);
         const aLabel = document.getElementById("splat-a-name");
@@ -970,6 +1243,989 @@
       cacheSplatFile(file.name, file);
       loadSplatURL(null, file.name, null, fileBytes);
       showStatus(`Loading: ${file.name}`);
+    }
+
+    // ── PLY parser (binary_little_endian / binary_big_endian / ascii) ──
+    // Focused on geometry pointclouds (Metashape MVS, etc.) — extracts x,y,z
+    // floats and skips other properties. Multi-element files supported as
+    // long as "vertex" is one of them.
+    function parsePly(buffer) {
+      const u8 = new Uint8Array(buffer);
+      // Find "end_header\n" — search byte-wise so binary tail can't false-match.
+      const target = "end_header";
+      let headerEnd = -1;
+      const ascii = new TextDecoder("ascii");
+      const headerLimit = Math.min(u8.length, 1 << 16); // 64KB max header
+      // Decode header chunk to string, find end_header line break.
+      const headerStr = ascii.decode(u8.subarray(0, headerLimit));
+      const idx = headerStr.indexOf(target);
+      if (idx < 0) throw new Error("PLY: end_header not found");
+      // Header ends at the newline AFTER "end_header"
+      let nl = headerStr.indexOf("\n", idx);
+      if (nl < 0) throw new Error("PLY: malformed header end");
+      headerEnd = nl + 1;
+
+      const lines = headerStr.slice(0, idx + target.length).replace(/\r\n/g, "\n").split("\n");
+      if (lines[0].trim() !== "ply") throw new Error("Not a PLY file");
+      let format = null;
+      const elements = [];
+      let cur = null;
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line || line.startsWith("comment ") || line.startsWith("obj_info ")) continue;
+        if (line.startsWith("format ")) {
+          format = line.split(/\s+/)[1];
+        } else if (line.startsWith("element ")) {
+          const p = line.split(/\s+/);
+          cur = { name: p[1], count: parseInt(p[2]), props: [] };
+          elements.push(cur);
+        } else if (line.startsWith("property ")) {
+          const p = line.split(/\s+/);
+          if (p[1] === "list") {
+            cur.props.push({ list: true, ctype: p[2], etype: p[3], name: p[4] });
+          } else {
+            cur.props.push({ list: false, type: p[1], name: p[2] });
+          }
+        }
+      }
+      if (!format) throw new Error("PLY: no format line");
+
+      const aliases = { int8: "char", uint8: "uchar", int16: "short", uint16: "ushort", int32: "int", uint32: "uint", float32: "float", float64: "double" };
+      const sz = { char: 1, uchar: 1, short: 2, ushort: 2, int: 4, uint: 4, float: 4, double: 8 };
+      const norm = (t) => aliases[t] || t;
+
+      // Compute byte size of a scalar (non-list) element row
+      const rowSize = (el) => el.props.reduce((s, p) => {
+        if (p.list) throw new Error(`PLY: list properties not supported on element "${el.name}"`);
+        return s + sz[norm(p.type)];
+      }, 0);
+
+      const vertexEl = elements.find((e) => e.name === "vertex");
+      if (!vertexEl) throw new Error("PLY: no vertex element");
+
+      // Compute byte offset to start of vertex element body (skip prior elements)
+      let off = headerEnd;
+      if (format !== "ascii") {
+        for (const el of elements) {
+          if (el === vertexEl) break;
+          off += rowSize(el) * el.count;
+        }
+      }
+
+      const propIdx = (n) => vertexEl.props.findIndex((p) => p.name === n);
+      const xi = propIdx("x"), yi = propIdx("y"), zi = propIdx("z");
+      if (xi < 0 || yi < 0 || zi < 0) throw new Error("PLY: vertex missing x/y/z");
+      const ri = Math.max(propIdx("red"),   propIdx("diffuse_red"),   propIdx("r"));
+      const gi = Math.max(propIdx("green"), propIdx("diffuse_green"), propIdx("g"));
+      const bi = Math.max(propIdx("blue"),  propIdx("diffuse_blue"),  propIdx("b"));
+
+      const n = vertexEl.count;
+      const positions = new Float32Array(n * 3);
+      const hasColor = (ri >= 0 && gi >= 0 && bi >= 0);
+      const colors = hasColor ? new Uint8Array(n * 3) : null;
+
+      if (format === "ascii") {
+        const body = ascii.decode(u8.subarray(headerEnd));
+        const blines = body.split(/\r?\n/);
+        for (let v = 0; v < n; v++) {
+          const t = blines[v].trim().split(/\s+/);
+          positions[v * 3]     = parseFloat(t[xi]);
+          positions[v * 3 + 1] = parseFloat(t[yi]);
+          positions[v * 3 + 2] = parseFloat(t[zi]);
+          if (hasColor) {
+            colors[v * 3]     = +t[ri];
+            colors[v * 3 + 1] = +t[gi];
+            colors[v * 3 + 2] = +t[bi];
+          }
+        }
+      } else {
+        const le = format === "binary_little_endian";
+        const view = new DataView(buffer);
+        const stride = rowSize(vertexEl);
+        const propOffsets = [];
+        let s = 0;
+        for (const p of vertexEl.props) { propOffsets.push(s); s += sz[norm(p.type)]; }
+        const readers = vertexEl.props.map((p) => {
+          const t = norm(p.type);
+          switch (t) {
+            case "char":   return (o) => view.getInt8(o);
+            case "uchar":  return (o) => view.getUint8(o);
+            case "short":  return (o) => view.getInt16(o, le);
+            case "ushort": return (o) => view.getUint16(o, le);
+            case "int":    return (o) => view.getInt32(o, le);
+            case "uint":   return (o) => view.getUint32(o, le);
+            case "float":  return (o) => view.getFloat32(o, le);
+            case "double": return (o) => view.getFloat64(o, le);
+            default: throw new Error("PLY: unknown type " + p.type);
+          }
+        });
+        const rx = readers[xi], ry = readers[yi], rz = readers[zi];
+        const ox = propOffsets[xi], oy = propOffsets[yi], oz = propOffsets[zi];
+        const rr = hasColor ? readers[ri] : null;
+        const rg = hasColor ? readers[gi] : null;
+        const rb = hasColor ? readers[bi] : null;
+        const orr = hasColor ? propOffsets[ri] : 0;
+        const og = hasColor ? propOffsets[gi] : 0;
+        const ob = hasColor ? propOffsets[bi] : 0;
+        for (let v = 0; v < n; v++) {
+          positions[v * 3]     = rx(off + ox);
+          positions[v * 3 + 1] = ry(off + oy);
+          positions[v * 3 + 2] = rz(off + oz);
+          if (hasColor) {
+            colors[v * 3]     = rr(off + orr);
+            colors[v * 3 + 1] = rg(off + og);
+            colors[v * 3 + 2] = rb(off + ob);
+          }
+          off += stride;
+        }
+      }
+      return { positions, colors, count: n };
+    }
+
+    // ── Spatial uniform grid for fast brush queries on dense clouds ──
+    // Compact storage: one Uint32Array of point indices, sorted by cell;
+    // cellOffsets gives the start of each cell's run.
+    function buildSpatialGrid(positions, cellSize) {
+      const n = positions.length / 3;
+      let minX = Infinity, minY = Infinity, minZ = Infinity;
+      let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+      for (let i = 0; i < n; i++) {
+        const x = positions[i * 3], y = positions[i * 3 + 1], z = positions[i * 3 + 2];
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+        if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+      }
+      const nx = Math.max(1, Math.ceil((maxX - minX) / cellSize) + 1);
+      const ny = Math.max(1, Math.ceil((maxY - minY) / cellSize) + 1);
+      const nz = Math.max(1, Math.ceil((maxZ - minZ) / cellSize) + 1);
+      const numCells = nx * ny * nz;
+      // Pass 1: count per cell
+      const counts = new Uint32Array(numCells);
+      const cellOf = new Uint32Array(n);
+      for (let i = 0; i < n; i++) {
+        const ix = Math.min(nx - 1, ((positions[i * 3]     - minX) / cellSize) | 0);
+        const iy = Math.min(ny - 1, ((positions[i * 3 + 1] - minY) / cellSize) | 0);
+        const iz = Math.min(nz - 1, ((positions[i * 3 + 2] - minZ) / cellSize) | 0);
+        const c = ix + iy * nx + iz * nx * ny;
+        cellOf[i] = c;
+        counts[c]++;
+      }
+      // Pass 2: prefix-sum offsets
+      const cellOffsets = new Uint32Array(numCells + 1);
+      let acc = 0;
+      for (let c = 0; c < numCells; c++) { cellOffsets[c] = acc; acc += counts[c]; }
+      cellOffsets[numCells] = acc;
+      // Pass 3: scatter
+      const cellIndices = new Uint32Array(n);
+      const cursors = new Uint32Array(numCells);
+      for (let i = 0; i < n; i++) {
+        const c = cellOf[i];
+        cellIndices[cellOffsets[c] + cursors[c]] = i;
+        cursors[c]++;
+      }
+      return { minX, minY, minZ, cellSize, nx, ny, nz, cellOffsets, cellIndices };
+    }
+
+    // Voxel-grid subsample: returns one representative-point index per occupied
+    // voxel. Used for picking — gives uniform spatial density regardless of
+    // perspective foreshortening, so foreground objects (thin trunks) get the
+    // same coverage as background facades. Without this, every-Nth subsampling
+    // biases against small foreground features.
+    function voxelSubsampleIndices(positions, voxelSize, capCount) {
+      const n = positions.length / 3;
+      let minX = Infinity, minY = Infinity, minZ = Infinity;
+      for (let i = 0; i < n; i++) {
+        if (positions[i * 3]     < minX) minX = positions[i * 3];
+        if (positions[i * 3 + 1] < minY) minY = positions[i * 3 + 1];
+        if (positions[i * 3 + 2] < minZ) minZ = positions[i * 3 + 2];
+      }
+      // 16-bit per axis packed into a single Number (≤ 2^48, safe).
+      const seen = new Map();
+      const M = 65536;
+      const M2 = M * M;
+      for (let i = 0; i < n; i++) {
+        const ix = ((positions[i * 3]     - minX) / voxelSize) | 0;
+        const iy = ((positions[i * 3 + 1] - minY) / voxelSize) | 0;
+        const iz = ((positions[i * 3 + 2] - minZ) / voxelSize) | 0;
+        if (ix >= M || iy >= M || iz >= M) continue; // bounds guard
+        const key = ix * M2 + iy * M + iz;
+        if (!seen.has(key)) seen.set(key, i);
+      }
+      const all = [...seen.values()];
+      if (all.length <= capCount) return new Uint32Array(all);
+      // Too many voxels for our cap: keep every Nth voxel from the dedup list.
+      const stride = Math.ceil(all.length / capCount);
+      const capped = new Uint32Array(Math.ceil(all.length / stride));
+      let j = 0;
+      for (let i = 0; i < all.length; i += stride) capped[j++] = all[i];
+      return capped.subarray(0, j);
+    }
+
+    function forEachInSphere(grid, cx, cy, cz, r, cb) {
+      const { minX, minY, minZ, cellSize, nx, ny, nz, cellOffsets, cellIndices } = grid;
+      const i0 = Math.max(0, Math.floor((cx - r - minX) / cellSize));
+      const i1 = Math.min(nx - 1, Math.floor((cx + r - minX) / cellSize));
+      const j0 = Math.max(0, Math.floor((cy - r - minY) / cellSize));
+      const j1 = Math.min(ny - 1, Math.floor((cy + r - minY) / cellSize));
+      const k0 = Math.max(0, Math.floor((cz - r - minZ) / cellSize));
+      const k1 = Math.min(nz - 1, Math.floor((cz + r - minZ) / cellSize));
+      for (let k = k0; k <= k1; k++) {
+        for (let j = j0; j <= j1; j++) {
+          const base = j * nx + k * nx * ny;
+          for (let i = i0; i <= i1; i++) {
+            const c = i + base;
+            const start = cellOffsets[c], end = cellOffsets[c + 1];
+            for (let p = start; p < end; p++) cb(cellIndices[p]);
+          }
+        }
+      }
+    }
+
+    // ── Tree painting: pickbuffer + brush + grow + export ──
+    const paintStatusEl = () => document.getElementById("paint-status");
+    const paintLabelEl = () => document.getElementById("paint-label");
+    const paintSwatchEl = () => document.getElementById("paint-swatch");
+    const paintStampCountEl = () => document.getElementById("paint-stamp-count");
+
+    function setPaintStatus(msg, color = "#666") {
+      const el = paintStatusEl();
+      if (el) { el.textContent = msg; el.style.color = color; }
+    }
+
+    function refreshPaintLabelUI() {
+      const lbl = paintLabelEl();
+      const sw = paintSwatchEl();
+      if (lbl) lbl.textContent = currentLabel;
+      if (sw) {
+        const c = colorForLabel(currentLabel);
+        sw.style.background = `rgb(${c.r * 255 | 0},${c.g * 255 | 0},${c.b * 255 | 0})`;
+      }
+      if (paintStampCountEl() && splatLabels) {
+        let n = 0;
+        for (let i = 0; i < splatLabels.length; i++) if (splatLabels[i] === currentLabel) n++;
+        paintStampCountEl().textContent = `${n.toLocaleString()} splats`;
+      }
+    }
+
+    function teardownPaintTarget() {
+      // Dispose paint-target-specific resources (picking, overlay, grid).
+      // Keeps splatCenters intact across cloud swaps.
+      if (pickingPoints) {
+        pickingPoints.geometry.dispose();
+        pickingPoints.material.dispose();
+        pickingPoints = null;
+      }
+      pickingScene = null;
+      if (pickingRT) {
+        pickingRT.dispose();
+        pickingRT = null;
+      }
+      if (paintedOverlay) {
+        paintedOverlay.parent?.remove(paintedOverlay);
+        paintedOverlay.geometry.dispose();
+        paintedOverlay.material.dispose();
+        paintedOverlay = null;
+      }
+      if (targetDebugOverlay) {
+        targetDebugOverlay.parent?.remove(targetDebugOverlay);
+        targetDebugOverlay.geometry.dispose();
+        targetDebugOverlay.material.dispose();
+        targetDebugOverlay = null;
+      }
+      if (brushSphere) {
+        brushSphere.parent?.remove(brushSphere);
+        brushSphere.geometry.dispose();
+        brushSphere.material.dispose();
+        brushSphere = null;
+      }
+      splatPositions = null;
+      splatLabels = null;
+      stampedMask = null;
+      pickingIndices = null;
+      spatialGrid = null;
+      currentLabel = 1;
+      lastBrushHit = null;
+    }
+
+    function teardownPaintAll() {
+      teardownPaintTarget();
+      splatCenters = null;
+      geomSourceName = null;
+      updateCloudStatusUI();
+    }
+
+    function updateCloudStatusUI() {
+      const el = document.getElementById("cloud-status");
+      if (!el) return;
+      if (geomSourceName) {
+        const k = splatPositions ? splatPositions.length / 3 : 0;
+        el.innerHTML = `Source: <span style="color:#86efac">${geomSourceName}</span> · ${k.toLocaleString()} pts`;
+      } else {
+        const k = splatCenters ? splatCenters.length / 3 : 0;
+        el.textContent = `Source: splat centers · ${k.toLocaleString()} pts`;
+      }
+    }
+
+    async function setupPaintForSplat(splatMesh) {
+      teardownPaintAll();
+      try {
+        await splatMesh.initialized;
+      } catch (e) {
+        console.warn("Splat initialized promise rejected:", e);
+        return;
+      }
+      const n = splatMesh.packedSplats?.numSplats ?? 0;
+      if (!n) return;
+
+      // Always extract trained-splat centers — used as default paint target,
+      // and (if a denser cloud is loaded) kept for export-time projection
+      // (each splat → nearest cloud-point label).
+      splatCenters = new Float32Array(n * 3);
+      splatMesh.forEachSplat((i, center) => {
+        splatCenters[i * 3]     = center.x;
+        splatCenters[i * 3 + 1] = center.y;
+        splatCenters[i * 3 + 2] = center.z;
+      });
+
+      setPaintTarget(splatCenters, null);
+      updateBBoxDiagnostic();
+
+      // Default grow Y-range to splat's full Y bbox so users with non-standard
+      // coords (Y down, large negative values, etc.) don't have growth blocked
+      // by the legacy [-0.5, 30] defaults.
+      const sBB = bboxOf(splatCenters);
+      growYMin = sBB.yMin;
+      growYMax = sBB.yMax;
+      const yMinIn = document.getElementById("grow-ymin");
+      const yMaxIn = document.getElementById("grow-ymax");
+      if (yMinIn) yMinIn.value = sBB.yMin.toFixed(1);
+      if (yMaxIn) yMaxIn.value = sBB.yMax.toFixed(1);
+    }
+
+    function setPaintTarget(positions, sourceName) {
+      teardownPaintTarget();
+      if (!currentSplat) return;
+      const n = positions.length / 3;
+      splatPositions = positions;
+      splatLabels = new Uint16Array(n);
+      stampedMask = new Uint8Array(n);
+      geomSourceName = sourceName;
+
+      // Spatial grid for O(neighbors) brush stamping. Cell size 1 unit (≈1m)
+      // is independent of brush radius; queries iterate cells overlapping the
+      // brush AABB, so any brush size works without rebuild.
+      const t0 = performance.now();
+      spatialGrid = buildSpatialGrid(positions, 1.0);
+      const gridMs = performance.now() - t0;
+
+      // Voxel-grid subsample for picking. Uniform spatial density (one point
+      // per ~5cm voxel) so foreground objects (thin trunks) are pickable —
+      // vs every-Nth which biased against small features in dense clouds.
+      const indices = voxelSubsampleIndices(positions, 0.05, PICK_SUBSAMPLE_TARGET);
+      const realK = indices.length;
+      const pickPositions = new Float32Array(realK * 3);
+      const pickColors = new Float32Array(realK * 3);
+      pickingIndices = new Uint32Array(realK);
+      for (let kk = 0; kk < realK; kk++) {
+        const i = indices[kk];
+        pickPositions[kk * 3]     = positions[i * 3];
+        pickPositions[kk * 3 + 1] = positions[i * 3 + 1];
+        pickPositions[kk * 3 + 2] = positions[i * 3 + 2];
+        // Encode (kk + 1) as RGB so 0 means "miss". 24 bits → 16M unique.
+        const id = kk + 1;
+        pickColors[kk * 3]     = (id        & 0xff) / 255;
+        pickColors[kk * 3 + 1] = ((id >> 8) & 0xff) / 255;
+        pickColors[kk * 3 + 2] = ((id >> 16) & 0xff) / 255;
+        pickingIndices[kk] = i;
+      }
+      const pickGeom = new THREE.BufferGeometry();
+      pickGeom.setAttribute("position",  new THREE.BufferAttribute(pickPositions.subarray(0, realK * 3), 3));
+      pickGeom.setAttribute("pickColor", new THREE.BufferAttribute(pickColors.subarray(0, realK * 3), 3));
+      // Custom shader: writes raw RGB so sRGB output conversion can't corrupt
+      // the encoded splat-index. ShaderMaterial doesn't auto-inject colorspace
+      // chunks the way PointsMaterial does.
+      const pickMat = new THREE.ShaderMaterial({
+        vertexShader: `
+          attribute vec3 pickColor;
+          varying vec3 vPickColor;
+          void main() {
+            vPickColor = pickColor;
+            gl_PointSize = 10.0;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vPickColor;
+          void main() {
+            gl_FragColor = vec4(vPickColor, 1.0);
+          }
+        `,
+        depthTest: true,
+        depthWrite: true,
+        transparent: false,
+      });
+      pickingPoints = new THREE.Points(pickGeom, pickMat);
+      pickingPoints.matrixAutoUpdate = false;
+      pickingScene = new THREE.Scene();
+      pickingScene.background = new THREE.Color(0x000000); // 0 = miss
+      pickingScene.add(pickingPoints);
+
+      pickingRT = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {
+        format: THREE.RGBAFormat,
+        type: THREE.UnsignedByteType,
+        depthBuffer: true,
+        minFilter: THREE.NearestFilter,
+        magFilter: THREE.NearestFilter,
+      });
+      pickingRT.texture.colorSpace = THREE.NoColorSpace;
+
+      // Live label overlay — colored Points at every labeled splat. Starts empty.
+      const overlayGeom = new THREE.BufferGeometry();
+      overlayGeom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(0), 3));
+      overlayGeom.setAttribute("color",    new THREE.BufferAttribute(new Float32Array(0), 3));
+      const overlayMat = new THREE.PointsMaterial({
+        size: 4,
+        sizeAttenuation: false,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.95,
+        depthTest: true,
+        depthWrite: false,
+      });
+      paintedOverlay = new THREE.Points(overlayGeom, overlayMat);
+      paintedOverlay.frustumCulled = false;
+      paintedOverlay.renderOrder = 999; // force after splat (same depth → unstable sort otherwise)
+      currentSplat.add(paintedOverlay);
+
+      // Debug overlay: same voxel-subsampled positions as picking, rendered
+      // as faint white dots. Toggle visibility to verify cloud-vs-splat alignment.
+      const debugGeom = new THREE.BufferGeometry();
+      debugGeom.setAttribute("position", new THREE.BufferAttribute(pickPositions.slice(0, realK * 3), 3));
+      const debugMat = new THREE.PointsMaterial({
+        size: 2,
+        sizeAttenuation: false,
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.5,
+        depthTest: true,
+        depthWrite: false,
+      });
+      targetDebugOverlay = new THREE.Points(debugGeom, debugMat);
+      targetDebugOverlay.frustumCulled = false;
+      targetDebugOverlay.visible = targetDebugVisible;
+      currentSplat.add(targetDebugOverlay);
+
+      // Brush indicator — translucent sphere following cursor.
+      const brushGeom = new THREE.SphereGeometry(brushRadiusM, 24, 16);
+      const brushMat = new THREE.MeshBasicMaterial({
+        color: colorForLabel(currentLabel),
+        wireframe: true,
+        transparent: true,
+        opacity: 0.65,
+        depthTest: false,  // brush is a UI element — always visible
+        depthWrite: false,
+      });
+      brushSphere = new THREE.Mesh(brushGeom, brushMat);
+      brushSphere.visible = false;
+      brushSphere.renderOrder = 1000;
+      scene.add(brushSphere);
+
+      refreshPaintLabelUI();
+      updateCloudStatusUI();
+      const label = sourceName ? `cloud "${sourceName}"` : "splat centers";
+      setPaintStatus(`Paint target: ${label} · ${n.toLocaleString()} pts · pick ${realK.toLocaleString()} · grid ${gridMs.toFixed(0)}ms`);
+    }
+
+    function pickSplatAt(clientX, clientY) {
+      if (!pickingPoints || !pickingRT || !currentSplat) return null;
+      // Sync picking points to splat's world transform. matrixAutoUpdate=false
+      // means three skips updateMatrix, but we MUST flag matrixWorldNeedsUpdate
+      // so updateMatrixWorld actually recomputes from our copied matrix —
+      // otherwise picking would use stale matrixWorld after model rotation.
+      currentSplat.updateMatrixWorld();
+      pickingPoints.matrix.copy(currentSplat.matrixWorld);
+      pickingPoints.matrixWorldNeedsUpdate = true;
+
+      // Resize RT if canvas size changed
+      const w = renderer.domElement.width, h = renderer.domElement.height;
+      if (pickingRT.width !== w || pickingRT.height !== h) {
+        pickingRT.setSize(w, h);
+      }
+
+      const prevTarget = renderer.getRenderTarget();
+      const prevAutoClear = renderer.autoClear;
+      renderer.autoClear = true;
+      renderer.setRenderTarget(pickingRT);
+      renderer.clear();
+      renderer.render(pickingScene, camera);
+      renderer.setRenderTarget(prevTarget);
+      renderer.autoClear = prevAutoClear;
+
+      // Read 1×1 at mouse position. Convert clientX/Y (CSS px, top-left origin)
+      // to RT pixel coords (bottom-left origin).
+      const dpr = renderer.getPixelRatio();
+      const rect = renderer.domElement.getBoundingClientRect();
+      const px = Math.max(0, Math.min(w - 1, Math.round((clientX - rect.left) * dpr)));
+      const py = Math.max(0, Math.min(h - 1, Math.round((rect.bottom - clientY) * dpr)));
+
+      // Read a window around the cursor and snap to the nearest non-zero pixel.
+      // Forgives small misses on sparse-cloud features (thin trunks etc).
+      const SNAP = 10; // half-window in RT pixels → 21x21
+      const x0 = Math.max(0, px - SNAP);
+      const x1 = Math.min(w - 1, px + SNAP);
+      const y0 = Math.max(0, py - SNAP);
+      const y1 = Math.min(h - 1, py + SNAP);
+      const rw = x1 - x0 + 1;
+      const rh = y1 - y0 + 1;
+      const buf = new Uint8Array(rw * rh * 4);
+      renderer.readRenderTargetPixels(pickingRT, x0, y0, rw, rh, buf);
+      const cxL = px - x0, cyL = py - y0;
+      let bestId = 0, bestD2 = Infinity;
+      for (let yy = 0; yy < rh; yy++) {
+        for (let xx = 0; xx < rw; xx++) {
+          const o = (yy * rw + xx) * 4;
+          const id = buf[o] | (buf[o + 1] << 8) | (buf[o + 2] << 16);
+          if (id === 0) continue;
+          const dx = xx - cxL, dy = yy - cyL;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < bestD2) { bestD2 = d2; bestId = id; }
+        }
+      }
+      if (bestId === 0) return null;
+      const pickIdx = bestId - 1;
+      if (pickIdx < 0 || pickIdx >= pickingIndices.length) return null;
+      const splatIdx = pickingIndices[pickIdx];
+
+      const localPos = new THREE.Vector3(
+        splatPositions[splatIdx * 3],
+        splatPositions[splatIdx * 3 + 1],
+        splatPositions[splatIdx * 3 + 2]
+      );
+      const worldPos = localPos.clone().applyMatrix4(currentSplat.matrixWorld);
+      return { splatIdx, localPos, worldPos };
+    }
+
+    function stampBrush(localCenter) {
+      if (!splatLabels || !splatPositions) return 0;
+      const r2 = brushRadiusM * brushRadiusM;
+      const cx = localCenter.x, cy = localCenter.y, cz = localCenter.z;
+      let stamped = 0;
+      const visit = (i) => {
+        const dx = splatPositions[i * 3]     - cx;
+        const dy = splatPositions[i * 3 + 1] - cy;
+        const dz = splatPositions[i * 3 + 2] - cz;
+        if (dx * dx + dy * dy + dz * dz <= r2) {
+          splatLabels[i] = currentLabel;
+          stampedMask[i] = 1;
+          stamped++;
+        }
+      };
+      if (spatialGrid) {
+        forEachInSphere(spatialGrid, cx, cy, cz, brushRadiusM, visit);
+      } else {
+        for (let i = 0; i < splatLabels.length; i++) visit(i);
+      }
+      return stamped;
+    }
+
+    function rebuildPaintedOverlay() {
+      if (!paintedOverlay || !splatLabels) return;
+      let n = 0;
+      for (let i = 0; i < splatLabels.length; i++) if (splatLabels[i] !== 0) n++;
+      const positions = new Float32Array(n * 3);
+      const colors = new Float32Array(n * 3);
+      let j = 0;
+      for (let i = 0; i < splatLabels.length; i++) {
+        const lbl = splatLabels[i];
+        if (lbl === 0) continue;
+        positions[j * 3]     = splatPositions[i * 3];
+        positions[j * 3 + 1] = splatPositions[i * 3 + 1];
+        positions[j * 3 + 2] = splatPositions[i * 3 + 2];
+        const c = colorForLabel(lbl);
+        colors[j * 3]     = c.r;
+        colors[j * 3 + 1] = c.g;
+        colors[j * 3 + 2] = c.b;
+        j++;
+      }
+      paintedOverlay.geometry.dispose();
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      g.setAttribute("color",    new THREE.BufferAttribute(colors, 3));
+      paintedOverlay.geometry = g;
+      paintedOverlay.frustumCulled = false;
+    }
+
+    function updateBrushFromCursor(clientX, clientY) {
+      if (!brushSphere || !paintMode) return;
+      const hit = pickSplatAt(clientX, clientY);
+      if (!hit) {
+        brushSphere.visible = false;
+        lastBrushHit = null;
+        return;
+      }
+      brushSphere.visible = true;
+      brushSphere.position.copy(hit.worldPos);
+      lastBrushHit = hit;
+    }
+
+    function applyBrushAtCursor(clientX, clientY) {
+      const hit = pickSplatAt(clientX, clientY);
+      if (!hit) return;
+      lastBrushHit = hit;
+      brushSphere.visible = true;
+      brushSphere.position.copy(hit.worldPos);
+      const stamped = stampBrush(hit.localPos);
+      if (stamped > 0) {
+        rebuildPaintedOverlay();
+        refreshPaintLabelUI();
+      }
+    }
+
+    // Voronoi-grow: each unpainted splat → nearest stamped centroid in (x,z),
+    // assigned only if within max radius. Trees that were stamped multiple
+    // times naturally have their centroid in the trunk.
+    function voronoiGrow({ maxRadiusM = 2.5, hMin = -0.5, hMax = 30.0 } = {}) {
+      if (!splatLabels || !splatPositions) return;
+      // Pass 1: per-label centroid in (x,z) using stamped splats only.
+      const sumX = new Map(), sumZ = new Map(), cnt = new Map();
+      for (let i = 0; i < splatLabels.length; i++) {
+        if (!stampedMask[i]) continue;
+        const lbl = splatLabels[i];
+        sumX.set(lbl, (sumX.get(lbl) || 0) + splatPositions[i * 3]);
+        sumZ.set(lbl, (sumZ.get(lbl) || 0) + splatPositions[i * 3 + 2]);
+        cnt.set(lbl, (cnt.get(lbl) || 0) + 1);
+      }
+      const labels = [...cnt.keys()];
+      if (labels.length === 0) {
+        setPaintStatus("No seeds to grow from", "#dc2626");
+        return;
+      }
+      const cx = labels.map(l => sumX.get(l) / cnt.get(l));
+      const cz = labels.map(l => sumZ.get(l) / cnt.get(l));
+
+      // Per-tree effective radius: half-distance to nearest other tree, capped.
+      const rEff = labels.map((_, idx) => {
+        let nearest = Infinity;
+        for (let j = 0; j < labels.length; j++) {
+          if (j === idx) continue;
+          const dx = cx[idx] - cx[j], dz = cz[idx] - cz[j];
+          const d = Math.sqrt(dx * dx + dz * dz);
+          if (d < nearest) nearest = d;
+        }
+        return Math.min(maxRadiusM, nearest * 0.5);
+      });
+
+      // Pass 2: assign every splat (even already-grown but not stamped) to
+      // nearest tree if within rEff and height band.
+      let assigned = 0;
+      for (let i = 0; i < splatLabels.length; i++) {
+        if (stampedMask[i]) continue; // never overwrite manual stamps
+        const y = splatPositions[i * 3 + 1];
+        if (y < hMin || y > hMax) {
+          if (splatLabels[i] !== 0) splatLabels[i] = 0;
+          continue;
+        }
+        const x = splatPositions[i * 3], z = splatPositions[i * 3 + 2];
+        let bestIdx = -1, bestD = Infinity;
+        for (let j = 0; j < labels.length; j++) {
+          const dx = x - cx[j], dz = z - cz[j];
+          const d2 = dx * dx + dz * dz;
+          if (d2 < bestD) { bestD = d2; bestIdx = j; }
+        }
+        if (bestIdx >= 0 && bestD <= rEff[bestIdx] * rEff[bestIdx]) {
+          splatLabels[i] = labels[bestIdx];
+          assigned++;
+        } else if (splatLabels[i] !== 0) {
+          splatLabels[i] = 0; // re-grow zone clears prior grow
+        }
+      }
+      rebuildPaintedOverlay();
+      refreshPaintLabelUI();
+      setPaintStatus(`Grew ${labels.length} trees → +${assigned.toLocaleString()} splats assigned`, "#86efac");
+    }
+
+    function clearGrowth() {
+      if (!splatLabels) return;
+      for (let i = 0; i < splatLabels.length; i++) {
+        if (!stampedMask[i]) splatLabels[i] = 0;
+      }
+      rebuildPaintedOverlay();
+      refreshPaintLabelUI();
+      setPaintStatus("Growth cleared, seeds preserved");
+    }
+
+    function clearAllPaint() {
+      if (!splatLabels) return;
+      splatLabels.fill(0);
+      stampedMask.fill(0);
+      currentLabel = 1;
+      rebuildPaintedOverlay();
+      refreshPaintLabelUI();
+      setPaintStatus("All labels cleared");
+    }
+
+    function clearCurrentTree() {
+      if (!splatLabels) return;
+      let removed = 0;
+      for (let i = 0; i < splatLabels.length; i++) {
+        if (splatLabels[i] === currentLabel) {
+          splatLabels[i] = 0;
+          stampedMask[i] = 0;
+          removed++;
+        }
+      }
+      rebuildPaintedOverlay();
+      refreshPaintLabelUI();
+      setPaintStatus(`Cleared tree #${currentLabel} (${removed.toLocaleString()} splats)`);
+    }
+
+    function packU16ToBase64(arr) {
+      const u8 = new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
+      let bin = "";
+      const chunk = 0x8000;
+      for (let i = 0; i < u8.length; i += chunk) {
+        bin += String.fromCharCode.apply(null, u8.subarray(i, Math.min(i + chunk, u8.length)));
+      }
+      return btoa(bin);
+    }
+
+    // For each trained-splat center, find the label of the nearest paint-target
+    // point within SEARCH_R. Allows downstream osmos\mega scripts to consume
+    // either the cloud-labels (dense) or splat-labels (projected) view.
+    function projectLabelsToSplatCenters() {
+      if (!splatCenters || !spatialGrid || !splatLabels) return null;
+      const SEARCH_R = 2.0;
+      const out = new Uint16Array(splatCenters.length / 3);
+      const r2max = SEARCH_R * SEARCH_R;
+      for (let i = 0; i < out.length; i++) {
+        const cx = splatCenters[i * 3], cy = splatCenters[i * 3 + 1], cz = splatCenters[i * 3 + 2];
+        let best = 0, bestD = r2max;
+        forEachInSphere(spatialGrid, cx, cy, cz, SEARCH_R, (j) => {
+          const lbl = splatLabels[j];
+          if (lbl === 0) return;
+          const dx = splatPositions[j * 3]     - cx;
+          const dy = splatPositions[j * 3 + 1] - cy;
+          const dz = splatPositions[j * 3 + 2] - cz;
+          const d2 = dx * dx + dy * dy + dz * dz;
+          if (d2 < bestD) { bestD = d2; best = lbl; }
+        });
+        out[i] = best;
+      }
+      return out;
+    }
+
+    function exportLabels() {
+      if (!splatLabels) { setPaintStatus("Nothing to export", "#dc2626"); return; }
+      const usedLabels = new Set();
+      for (let i = 0; i < splatLabels.length; i++) {
+        if (splatLabels[i] !== 0) usedLabels.add(splatLabels[i]);
+      }
+      const trees = [...usedLabels].sort((a, b) => a - b).map(lbl => {
+        let cnt = 0, sx = 0, sy = 0, sz = 0;
+        let minY = Infinity, maxY = -Infinity;
+        let seedCnt = 0;
+        for (let i = 0; i < splatLabels.length; i++) {
+          if (splatLabels[i] !== lbl) continue;
+          cnt++;
+          sx += splatPositions[i * 3];
+          sy += splatPositions[i * 3 + 1];
+          sz += splatPositions[i * 3 + 2];
+          if (splatPositions[i * 3 + 1] < minY) minY = splatPositions[i * 3 + 1];
+          if (splatPositions[i * 3 + 1] > maxY) maxY = splatPositions[i * 3 + 1];
+          if (stampedMask[i]) seedCnt++;
+        }
+        return {
+          label: lbl,
+          count: cnt,
+          centroid: [sx / cnt, sy / cnt, sz / cnt],
+          y_range: [minY, maxY],
+          seed_count: seedCnt,
+        };
+      });
+
+      const targetLabelsB64 = packU16ToBase64(splatLabels);
+      // Project to splat centers only when paint target is a cloud (else
+      // paint_target_labels already IS the splat labels).
+      const isCloud = !!geomSourceName;
+      let splatLabelsB64 = null;
+      let splatLabeledCount = 0;
+      if (isCloud) {
+        setPaintStatus("Projecting labels to splat centers…");
+        const projected = projectLabelsToSplatCenters();
+        if (projected) {
+          for (let i = 0; i < projected.length; i++) if (projected[i] !== 0) splatLabeledCount++;
+          splatLabelsB64 = packU16ToBase64(projected);
+        }
+      }
+
+      const out = {
+        version: 2,
+        splat_source: currentModelName,
+        geometry_source: geomSourceName,    // null = labels are on splat centers
+        paint_target_count: splatLabels.length,
+        paint_target_labels_base64: targetLabelsB64,
+        splat_count: splatCenters ? splatCenters.length / 3 : null,
+        splat_labels_base64: splatLabelsB64, // null if no cloud was used
+        splat_labeled_count: isCloud ? splatLabeledCount : null,
+        dtype: "uint16-le",
+        trees,
+      };
+      const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${currentModelName.replace(/\.[^.]+$/, "")}_labels.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      const proj = isCloud ? ` · ${splatLabeledCount.toLocaleString()} splats projected` : "";
+      setPaintStatus(`Exported ${trees.length} trees${proj} → ${a.download}`, "#86efac");
+    }
+
+    function bboxOf(positions) {
+      let xMin = Infinity, yMin = Infinity, zMin = Infinity;
+      let xMax = -Infinity, yMax = -Infinity, zMax = -Infinity;
+      for (let i = 0; i < positions.length; i += 3) {
+        if (positions[i]     < xMin) xMin = positions[i];
+        if (positions[i + 1] < yMin) yMin = positions[i + 1];
+        if (positions[i + 2] < zMin) zMin = positions[i + 2];
+        if (positions[i]     > xMax) xMax = positions[i];
+        if (positions[i + 1] > yMax) yMax = positions[i + 1];
+        if (positions[i + 2] > zMax) zMax = positions[i + 2];
+      }
+      return { xMin, yMin, zMin, xMax, yMax, zMax };
+    }
+
+    function fmtBBox(bb) {
+      const f = (v) => v.toFixed(1);
+      return `X[${f(bb.xMin)},${f(bb.xMax)}] Y[${f(bb.yMin)},${f(bb.yMax)}] Z[${f(bb.zMin)},${f(bb.zMax)}]`;
+    }
+
+    function updateBBoxDiagnostic() {
+      const el = document.getElementById("cloud-bbox");
+      if (!el) return;
+      if (!splatCenters) { el.textContent = ""; return; }
+      const splatBB = bboxOf(splatCenters);
+      let html = `splat: ${fmtBBox(splatBB)}`;
+      if (rawCloudPositions) {
+        const cloudBB = bboxOf(rawCloudPositions);
+        html += `<br>cloud: ${fmtBBox(cloudBB)}`;
+        // Compare raw-cloud dims to splat dims; if the SAME axis dims don't
+        // match, suggest auto-align (which handles axis swaps too).
+        const sDim = [splatBB.xMax - splatBB.xMin, splatBB.yMax - splatBB.yMin, splatBB.zMax - splatBB.zMin];
+        const cDim = [cloudBB.xMax - cloudBB.xMin, cloudBB.yMax - cloudBB.yMin, cloudBB.zMax - cloudBB.zMin];
+        const sameAxisCost = sDim.reduce((a, _, i) => a + Math.abs(sDim[i] - cDim[i]), 0);
+        const meanDim = sDim.reduce((a, v) => a + v, 0) / 3;
+        const isIdentity = cloudPerm[0] === 0 && cloudPerm[1] === 1 && cloudPerm[2] === 2 && cloudSigns.every(s => s === 1);
+        if (sameAxisCost > meanDim * 0.3 && isIdentity) {
+          html += `<br><span style="color:#fbbf24">⚠ Axes don't match — click "Auto-align"</span>`;
+        }
+        if (!isIdentity) {
+          html += `<br><span style="color:#86efac">transform: out=${transformLabel()}</span>`;
+        }
+      }
+      el.innerHTML = html;
+    }
+
+    function deriveCloudPositions() {
+      if (!rawCloudPositions) return null;
+      const n = rawCloudPositions.length;
+      const out = new Float32Array(n);
+      const [pX, pY, pZ] = cloudPerm;
+      const [sX, sY, sZ] = cloudSigns;
+      for (let i = 0; i < n; i += 3) {
+        out[i]     = rawCloudPositions[i + pX] * sX;
+        out[i + 1] = rawCloudPositions[i + pY] * sY;
+        out[i + 2] = rawCloudPositions[i + pZ] * sZ;
+      }
+      return out;
+    }
+
+    function transformLabel() {
+      const ax = ["X", "Y", "Z"];
+      const parts = [];
+      for (let i = 0; i < 3; i++) {
+        parts.push((cloudSigns[i] === -1 ? "-" : "") + ax[cloudPerm[i]]);
+      }
+      return `(${parts.join(",")})`;
+    }
+
+    function autoAlignCloud() {
+      if (!rawCloudPositions || !splatCenters) {
+        setPaintStatus("Need both splat + cloud loaded", "#dc2626");
+        return;
+      }
+      const sBB = bboxOf(splatCenters);
+      const cBB = bboxOf(rawCloudPositions);
+      const sDim = [sBB.xMax - sBB.xMin, sBB.yMax - sBB.yMin, sBB.zMax - sBB.zMin];
+      const cDim = [cBB.xMax - cBB.xMin, cBB.yMax - cBB.yMin, cBB.zMax - cBB.zMin];
+      const sCtr = [(sBB.xMin + sBB.xMax) / 2, (sBB.yMin + sBB.yMax) / 2, (sBB.zMin + sBB.zMax) / 2];
+      const cCtr = [(cBB.xMin + cBB.xMax) / 2, (cBB.yMin + cBB.yMax) / 2, (cBB.zMin + cBB.zMax) / 2];
+
+      // Pick the permutation that minimizes total |dim diff|.
+      const perms = [[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]];
+      let bestPerm = perms[0], bestCost = Infinity;
+      for (const p of perms) {
+        let c = 0;
+        for (let i = 0; i < 3; i++) c += Math.abs(sDim[i] - cDim[p[i]]);
+        if (c < bestCost) { bestCost = c; bestPerm = p; }
+      }
+      // Sign by center comparison. Skip when either center is near-zero.
+      const signs = [1, 1, 1];
+      for (let i = 0; i < 3; i++) {
+        const sc = sCtr[i], cc = cCtr[bestPerm[i]];
+        if (Math.abs(sc) > 1 && Math.abs(cc) > 1 && sc * cc < 0) signs[i] = -1;
+      }
+
+      cloudPerm = bestPerm;
+      cloudSigns = signs;
+      // Reflect signs into checkboxes
+      flipXCb.checked = signs[0] === -1;
+      flipYCb.checked = signs[1] === -1;
+      flipZCb.checked = signs[2] === -1;
+      reapplyCloudTransform();
+      setPaintStatus(`Auto-aligned: out=${transformLabel()}`, "#86efac");
+    }
+
+    function reapplyCloudTransform() {
+      if (!rawCloudPositions || !geomSourceName) return;
+      const transformed = deriveCloudPositions();
+      setPaintTarget(transformed, geomSourceName);
+      updateBBoxDiagnostic();
+    }
+
+    async function loadGeometryCloud(file) {
+      if (!currentSplat || !splatCenters) {
+        setPaintStatus("Load a splat first", "#dc2626");
+        return;
+      }
+      setPaintStatus(`Reading ${file.name}…`);
+      const buf = await file.arrayBuffer();
+      let parsed;
+      try {
+        parsed = parsePly(buf);
+      } catch (e) {
+        console.error("PLY parse failed:", e);
+        setPaintStatus(`PLY parse failed: ${e.message}`, "#dc2626");
+        return;
+      }
+      if (!parsed.count) {
+        setPaintStatus("PLY has no vertices", "#dc2626");
+        return;
+      }
+      rawCloudPositions = parsed.positions;
+      // Apply current flip state when loading
+      const transformed = deriveCloudPositions();
+      setPaintTarget(transformed, file.name);
+      updateBBoxDiagnostic();
+      showStatus(`Cloud loaded: ${parsed.count.toLocaleString()} pts`);
+    }
+
+    function clearGeometryCloud() {
+      if (!splatCenters) return;
+      rawCloudPositions = null;
+      setPaintTarget(splatCenters, null);
+      updateBBoxDiagnostic();
+      showStatus("Reverted to splat centers");
     }
 
     // ── Compare mode: load second splat (B) ──
