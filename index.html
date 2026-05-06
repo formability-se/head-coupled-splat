@@ -332,9 +332,9 @@
     }
     .saved-row {
       display: grid;
-      grid-template-columns: 1fr auto auto auto;
+      grid-template-columns: 1fr auto auto auto auto;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
       padding: 6px 6px;
       background: rgba(255,255,255,0.02);
       border: 1px solid #2a2a2e;
@@ -352,7 +352,7 @@
     }
     .saved-row .btn-mini {
       grid-row: 1 / 3;
-      padding: 4px 8px;
+      padding: 3px 6px;
       background: rgba(79, 70, 229, 0.15);
       border: 1px solid rgba(79, 70, 229, 0.3);
       border-radius: 4px;
@@ -360,6 +360,7 @@
       font-size: 11px;
       cursor: pointer;
       font-family: inherit;
+      min-width: 22px;
     }
     .saved-row .btn-mini:hover { background: rgba(79, 70, 229, 0.3); }
     .tree-row {
@@ -417,8 +418,165 @@
     }
     .tree-row .tree-del:hover { background: rgba(220,38,38,0.2); }
 
+    /* Markers panel — sits right of labeling panel, top-left */
+    #markers-panel {
+      position: fixed;
+      top: 16px;
+      left: 332px;
+      z-index: 11;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(79, 70, 229, 0.3);
+      border-radius: 12px;
+      padding: 14px 16px;
+      width: 300px;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      font-size: 12px;
+      display: none;
+    }
+    #markers-panel h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #818cf8;
+      margin-bottom: 10px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    #markers-panel h4 {
+      font-size: 11px;
+      font-weight: 600;
+      color: #a0a0a0;
+      margin: 12px 0 6px;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+    #markers-panel h4:first-child { margin-top: 0; }
+    .marker-row {
+      display: grid;
+      grid-template-columns: 16px 24px 1fr 22px;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 4px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid #2a2a2e;
+      border-radius: 6px;
+      cursor: grab;
+    }
+    .marker-row.dragging { opacity: 0.4; }
+    .marker-row.drop-above { border-top: 2px solid #818cf8; }
+    .marker-row.drop-below { border-bottom: 2px solid #818cf8; }
+    .marker-row .marker-handle {
+      color: #555;
+      font-size: 13px;
+      text-align: center;
+      cursor: grab;
+      user-select: none;
+    }
+    .marker-row .marker-num {
+      font-size: 11px;
+      color: #c7d2fe;
+      font-weight: 600;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    .marker-row .marker-name {
+      background: transparent;
+      border: none;
+      color: #e4e4e7;
+      font-size: 11px;
+      font-family: inherit;
+      padding: 2px 4px;
+      min-width: 0;
+    }
+    .marker-row .marker-name:focus { outline: 1px solid rgba(79,70,229,0.5); border-radius: 3px; }
+    .marker-row .marker-del {
+      width: 18px; height: 18px;
+      background: transparent;
+      border: 1px solid rgba(220,38,38,0.4);
+      border-radius: 4px;
+      color: #fca5a5;
+      cursor: pointer;
+      padding: 0;
+      font-size: 12px;
+      line-height: 1;
+      font-family: inherit;
+    }
+    .marker-row .marker-del:hover { background: rgba(220,38,38,0.2); }
+
+    /* Posts panel — sits to the right of markers panel */
+    #posts-panel {
+      position: fixed;
+      top: 16px;
+      left: 648px;
+      z-index: 11;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(79, 70, 229, 0.3);
+      border-radius: 12px;
+      padding: 14px 16px;
+      width: 300px;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      font-size: 12px;
+      display: none;
+    }
+    #posts-panel h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #818cf8;
+      margin-bottom: 10px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    #posts-panel h4 {
+      font-size: 11px;
+      font-weight: 600;
+      color: #a0a0a0;
+      margin: 12px 0 6px;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+    .post-row {
+      display: grid;
+      grid-template-columns: 24px 1fr 56px 22px;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 4px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid #2a2a2e;
+      border-radius: 6px;
+    }
+    .post-row .post-num {
+      font-size: 11px; color: #c7d2fe; font-weight: 600;
+      text-align: center; font-variant-numeric: tabular-nums;
+    }
+    .post-row input[type="text"], .post-row input[type="number"] {
+      background: transparent; border: none; color: #e4e4e7;
+      font-size: 11px; font-family: inherit; padding: 2px 4px; min-width: 0;
+    }
+    .post-row input[type="number"] { text-align: right; }
+    .post-row input:focus { outline: 1px solid rgba(79,70,229,0.5); border-radius: 3px; }
+    .post-row .post-del {
+      width: 18px; height: 18px;
+      background: transparent;
+      border: 1px solid rgba(220,38,38,0.4);
+      border-radius: 4px;
+      color: #fca5a5;
+      cursor: pointer;
+      padding: 0;
+      font-size: 12px;
+      line-height: 1;
+      font-family: inherit;
+    }
+    .post-row .post-del:hover { background: rgba(220,38,38,0.2); }
+
     /* Tree painting */
     body.paint-mode { cursor: crosshair; }
+    body.marker-mode { cursor: crosshair; }
+    body.marker-mode #three-canvas { cursor: crosshair; }
+    body.post-mode { cursor: crosshair; }
+    body.post-mode #three-canvas { cursor: crosshair; }
     body.paint-mode #three-canvas { cursor: crosshair; }
     .paint-pill {
       display: inline-flex; align-items: center; gap: 6px;
@@ -613,6 +771,16 @@
       </div>
     </div>
 
+    <!-- Markers entry (panel itself appears top-left) -->
+    <div style="margin-top:14px;border-top:1px solid #2a2a2e;padding-top:12px;">
+      <button class="btn" id="btn-marker-mode-entry" style="width:100%;" title="Place numbered wiring nodes connected by 3D lines">Place wiring</button>
+    </div>
+
+    <!-- Posts entry -->
+    <div style="margin-top:8px;">
+      <button class="btn" id="btn-post-mode-entry" style="width:100%;" title="Place vertical objects (wiring snaps to them)">Place objects</button>
+    </div>
+
     <!-- Tree painting -->
     <div style="margin-top:14px;border-top:1px solid #2a2a2e;padding-top:12px;">
       <button class="btn" id="btn-paint-toggle" style="width:100%;">Paint trees</button>
@@ -698,9 +866,61 @@
   <input type="file" id="file-input" accept=".spz,.ply,.splat,.ksplat,.sogs,.sog" />
   <input type="file" id="file-input-b" accept=".spz,.ply,.splat,.ksplat,.sogs,.sog" />
   <input type="file" id="file-input-cloud" accept=".ply" />
+  <!-- Posts/objects panel: vertical posts placed on the splat, used as snap-targets for markers -->
+  <div id="posts-panel">
+    <h3>Objects</h3>
+    <div style="font-size:10px;color:#a0a0a0;margin-bottom:8px;">
+      <label style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+        <input type="checkbox" id="posts-show-labels" checked style="margin:0;cursor:pointer;">
+        Show number labels
+      </label>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#a0a0a0;margin-bottom:6px;">
+      <span title="Splat units per real meter — adjust if posts look wrong scale">Scale:</span>
+      <input type="number" id="post-scale" step="0.05" min="0.05" value="1.0"
+        style="width:70px;background:#0a0a0a;border:1px solid #2a2a2e;border-radius:4px;padding:3px 5px;font-size:11px;color:#e4e4e7;font-family:inherit;text-align:right;" />
+      <span style="color:#666;font-size:10px;">units/m</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#a0a0a0;margin-bottom:8px;">
+      <span>Default height (m):</span>
+      <input type="number" id="post-default-height" step="0.1" min="0.1" value="4.5"
+        style="width:70px;background:#0a0a0a;border:1px solid #2a2a2e;border-radius:4px;padding:3px 5px;font-size:11px;color:#e4e4e7;font-family:inherit;text-align:right;" />
+    </div>
+    <div class="btn-row" style="margin-top:0;">
+      <button class="btn" id="btn-post-mode" style="flex:1;font-size:11px;" title="Click on splat to drop a vertical object">Place objects</button>
+      <button class="btn" id="btn-clear-posts" title="Remove all posts" style="font-size:11px;">Clear all</button>
+    </div>
+    <h4>Objects (auto-saved)</h4>
+    <div id="post-list" class="trees-list"></div>
+  </div>
+
+  <!-- Markers panel: ordered point sets connected by 3D lines -->
+  <div id="markers-panel">
+    <h3>Wiring</h3>
+    <div id="current-marker-set" style="font-size:10px;color:#666;margin-bottom:6px;line-height:1.4;">Editing: <span style="color:#a0a0a0;">unsaved</span></div>
+    <div style="font-size:10px;color:#a0a0a0;margin-bottom:8px;">
+      <label style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+        <input type="checkbox" id="markers-show-labels" checked style="margin:0;cursor:pointer;">
+        Show number labels
+      </label>
+    </div>
+    <div class="btn-row" style="margin-top:0;">
+      <button class="btn" id="btn-marker-mode" style="flex:1;font-size:11px;" title="Click on splat to drop a wiring node">Place wiring</button>
+    </div>
+    <h4>Saved sets</h4>
+    <div id="saved-marker-list" class="saved-list"></div>
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn" id="btn-new-marker-set" style="flex:1;font-size:11px;" title="Start a fresh unsaved set (clears current edits)">New</button>
+      <button class="btn" id="btn-save-markers" style="flex:1;font-size:11px;">Save</button>
+      <button class="btn" id="btn-save-markers-as" style="flex:1;font-size:11px;">Save as new…</button>
+    </div>
+    <h4>Wiring nodes (drag to reorder)</h4>
+    <div id="marker-list" class="trees-list"></div>
+  </div>
+
   <!-- Labeling library + per-tree metadata (visible only in paint mode) -->
   <div id="labeling-panel">
-    <h3>Labelings</h3>
+    <h3>Color markings</h3>
     <div id="current-labeling" style="font-size:10px;color:#666;margin-bottom:8px;line-height:1.4;">Editing: <span style="color:#a0a0a0;">unsaved</span></div>
     <h4>Saved</h4>
     <div id="saved-list" class="saved-list"></div>
@@ -760,6 +980,9 @@
   <script type="module">
     import * as THREE from "three";
     import { SplatMesh, SparkRenderer, RgbaArray } from "@sparkjsdev/spark";
+    import { Line2 } from "three/examples/jsm/lines/Line2.js";
+    import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
+    import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js";
 
     // ── DOM refs ──
     const canvas = document.getElementById("three-canvas");
@@ -964,6 +1187,8 @@
       paintToggleBtn.classList.toggle("paint-active", paintMode);
       document.body.classList.toggle("paint-mode", paintMode);
       updateLabelingPanelVisibility();
+      if (paintMode && markerMode) setMarkerMode(false);
+      if (paintMode && postMode) setPostMode(false);
       if (brushSphere) brushSphere.visible = false;
       if (!paintMode) {
         isPainting = false;
@@ -1075,6 +1300,212 @@
     });
     document.getElementById("btn-clear-cloud").addEventListener("click", clearGeometryCloud);
 
+    // ── Marker mode + panel handlers ──
+    const markerModeBtn = document.getElementById("btn-marker-mode");
+    function setMarkerMode(on) {
+      markerMode = !!on;
+      const txt = markerMode ? "Exit place mode" : "Place wiring";
+      markerModeBtn.textContent = txt;
+      markerModeBtn.classList.toggle("paint-active", markerMode);
+      const entry = document.getElementById("btn-marker-mode-entry");
+      if (entry) {
+        entry.textContent = txt;
+        entry.classList.toggle("paint-active", markerMode);
+      }
+      document.body.classList.toggle("marker-mode", markerMode);
+      // Mutually exclusive with paint mode + post mode
+      if (markerMode && paintMode) setPaintMode(false);
+      if (markerMode && postMode) setPostMode(false);
+      // Need a paint target for picking — set up if not already
+      if (markerMode && !pickingPoints && currentSplat) {
+        setupPaintForSplat(currentSplat).catch(() => {});
+      }
+      if (!markerMode && markerPreview) markerPreview.visible = false;
+      updateMarkersPanelVisibility();
+    }
+    markerModeBtn.addEventListener("click", () => setMarkerMode(!markerMode));
+    // Entry button in the controls panel — same handler, also keeps text in sync
+    const markerModeEntryBtn = document.getElementById("btn-marker-mode-entry");
+    markerModeEntryBtn.addEventListener("click", () => setMarkerMode(!markerMode));
+
+    // ── Post mode + panel handlers ──
+    const postModeBtn = document.getElementById("btn-post-mode");
+    const postModeEntryBtn = document.getElementById("btn-post-mode-entry");
+    function setPostMode(on) {
+      postMode = !!on;
+      const txt = postMode ? "Exit place mode" : "Place objects";
+      postModeBtn.textContent = txt;
+      postModeBtn.classList.toggle("paint-active", postMode);
+      postModeEntryBtn.textContent = txt;
+      postModeEntryBtn.classList.toggle("paint-active", postMode);
+      document.body.classList.toggle("post-mode", postMode);
+      // Mutex with paint + marker
+      if (postMode && paintMode) setPaintMode(false);
+      if (postMode && markerMode) setMarkerMode(false);
+      // Need a paint target for picking
+      if (postMode && !pickingPoints && currentSplat) {
+        setupPaintForSplat(currentSplat).catch(() => {});
+      }
+      ensurePostVisuals();
+      if (!postMode && postPreview) postPreview.visible = false;
+      else if (postPreview) postPreview.visible = false; // Hidden until cursor moves over splat
+      updatePostsPanelVisibility();
+    }
+    postModeBtn.addEventListener("click", () => setPostMode(!postMode));
+    postModeEntryBtn.addEventListener("click", () => setPostMode(!postMode));
+
+    document.getElementById("post-default-height").addEventListener("change", (e) => {
+      const v = parseFloat(e.target.value);
+      if (isFinite(v) && v > 0) {
+        defaultPostHeight = v;
+        updatePostPreviewGeometry();
+        persistPosts();
+      }
+    });
+    document.getElementById("post-scale").addEventListener("change", (e) => {
+      const v = parseFloat(e.target.value);
+      if (isFinite(v) && v > 0) {
+        splatUnitsPerMeter = v;
+        rebuildPostVisuals();
+        updatePostPreviewGeometry();
+        persistPosts();
+      }
+    });
+    document.getElementById("btn-clear-posts").addEventListener("click", () => {
+      if (posts.length === 0) return;
+      if (confirm(`Delete all ${posts.length} posts?`)) clearAllPosts();
+    });
+
+    const postList = document.getElementById("post-list");
+    postList.addEventListener("input", (e) => {
+      const id = e.target.dataset.id;
+      const field = e.target.dataset.field;
+      if (!id || !field) return;
+      updatePostField(id, field, e.target.value);
+    });
+    postList.addEventListener("click", (e) => {
+      const del = e.target.closest(".post-del");
+      if (del) {
+        const id = del.dataset.id;
+        if (confirm("Delete this object?")) removePost(id);
+      }
+    });
+
+    document.getElementById("markers-show-labels").addEventListener("change", (e) => {
+      setMarkerLabelsVisible(e.target.checked);
+    });
+    document.getElementById("posts-show-labels").addEventListener("change", (e) => {
+      setPostLabelsVisible(e.target.checked);
+    });
+
+    document.getElementById("btn-new-marker-set").addEventListener("click", () => {
+      if (markers.length > 0 && !confirm("Start a fresh set? Current edits will be discarded (saved sets unaffected).")) return;
+      markers = [];
+      currentMarkerSetId = null;
+      currentMarkerSetName = null;
+      rebuildMarkerVisuals();
+      refreshMarkerListUI();
+      updateCurrentMarkerSetUI();
+      refreshSavedMarkerListUI();
+    });
+
+    document.getElementById("btn-save-markers").addEventListener("click", async () => {
+      if (currentMarkerSetId) {
+        await saveMarkerSet(currentMarkerSetName || "untitled", { overwriteId: currentMarkerSetId });
+      } else {
+        const name = prompt("Name this wiring set:", `${currentModelName} wiring · ${new Date().toISOString().slice(0,10)}`);
+        if (name && name.trim()) await saveMarkerSet(name.trim());
+      }
+    });
+    document.getElementById("btn-save-markers-as").addEventListener("click", async () => {
+      const seed = currentMarkerSetName ? `${currentMarkerSetName} (copy)` : `${currentModelName} markers · ${new Date().toISOString().slice(0,10)}`;
+      const name = prompt("Save as new wiring set — name:", seed);
+      if (name && name.trim()) await saveMarkerSet(name.trim());
+    });
+
+    document.getElementById("saved-marker-list").addEventListener("click", async (e) => {
+      const btn = e.target.closest(".btn-mini");
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const act = btn.dataset.act;
+      if (act === "toggle-show") {
+        if (displayedMarkerSets.has(id)) hideOverlaySet(id);
+        else await showOverlaySet(id);
+        await refreshSavedMarkerListUI();
+      } else if (act === "load") {
+        // If currently shown as overlay, drop overlay before loading as active
+        if (displayedMarkerSets.has(id)) hideOverlaySet(id);
+        await loadMarkerSet(id);
+      } else if (act === "delete") {
+        if (confirm("Delete this wiring set?")) {
+          if (displayedMarkerSets.has(id)) hideOverlaySet(id);
+          await deleteMarkerSet(id);
+        }
+      } else if (act === "rename") {
+        const newName = prompt("New name:");
+        if (newName && newName.trim()) await renameMarkerSet(id, newName.trim());
+      }
+    });
+
+    const markerList = document.getElementById("marker-list");
+    markerList.addEventListener("input", (e) => {
+      if (e.target.classList.contains("marker-name")) {
+        const id = e.target.dataset.id;
+        const m = markers.find(x => x.id === id);
+        if (m) m.name = e.target.value;
+      }
+    });
+    markerList.addEventListener("click", (e) => {
+      const del = e.target.closest(".marker-del");
+      if (del) {
+        const id = del.dataset.id;
+        if (confirm("Delete this wiring node?")) removeMarker(id);
+      }
+    });
+
+    // HTML5 drag-and-drop reorder
+    let dragSrcIdx = -1;
+    markerList.addEventListener("dragstart", (e) => {
+      const row = e.target.closest(".marker-row");
+      if (!row) return;
+      dragSrcIdx = parseInt(row.dataset.idx);
+      row.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      // Firefox needs data set on dragstart
+      e.dataTransfer.setData("text/plain", String(dragSrcIdx));
+    });
+    markerList.addEventListener("dragend", (e) => {
+      const row = e.target.closest(".marker-row");
+      if (row) row.classList.remove("dragging");
+      markerList.querySelectorAll(".marker-row").forEach(r => {
+        r.classList.remove("drop-above", "drop-below");
+      });
+    });
+    markerList.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      const row = e.target.closest(".marker-row");
+      if (!row) return;
+      // Indicate drop position based on cursor Y vs row midpoint
+      const rect = row.getBoundingClientRect();
+      const above = e.clientY < rect.top + rect.height / 2;
+      markerList.querySelectorAll(".marker-row").forEach(r => r.classList.remove("drop-above", "drop-below"));
+      row.classList.add(above ? "drop-above" : "drop-below");
+    });
+    markerList.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const row = e.target.closest(".marker-row");
+      if (!row || dragSrcIdx < 0) return;
+      let dstIdx = parseInt(row.dataset.idx);
+      const rect = row.getBoundingClientRect();
+      const above = e.clientY < rect.top + rect.height / 2;
+      if (!above) dstIdx += 1;
+      // Adjust for removal of source from earlier position
+      if (dragSrcIdx < dstIdx) dstIdx -= 1;
+      reorderMarker(dragSrcIdx, dstIdx);
+      dragSrcIdx = -1;
+    });
+
     // ── Labeling panel handlers ──
     document.getElementById("btn-save-labeling").addEventListener("click", async () => {
       if (currentLabelingId) {
@@ -1157,7 +1588,16 @@
 
     // Mouse interaction in paint mode (canvas-only; UI-pointer guarded elsewhere)
     canvas.addEventListener("pointermove", (e) => {
-      if (!paintMode || pointerOverUI) return;
+      if (pointerOverUI) return;
+      if (postMode) {
+        updatePostPreview(e.clientX, e.clientY);
+        return;
+      }
+      if (markerMode) {
+        updateMarkerPreview(e.clientX, e.clientY);
+        return;
+      }
+      if (!paintMode) return;
       if (isPainting) {
         applyBrushAtCursor(e.clientX, e.clientY);
       } else {
@@ -1166,6 +1606,8 @@
     });
     canvas.addEventListener("pointerleave", () => {
       if (brushSphere) brushSphere.visible = false;
+      if (markerPreview) markerPreview.visible = false;
+      if (postPreview) postPreview.visible = false;
     });
 
     // Divider drag
@@ -1209,8 +1651,36 @@
     // ── Mouse drag for rotation ──
     canvas.addEventListener("mousedown", (e) => {
       if (pointerOverUI) return;
+      if (postMode) {
+        if (e.button === 0) {
+          if (!pickingPoints) {
+            if (currentSplat) setupPaintForSplat(currentSplat).catch(() => {});
+            return;
+          }
+          const hit = pickSplatAt(e.clientX, e.clientY);
+          if (hit) placePost(hit.worldPos);
+          return;
+        }
+      }
+      if (markerMode) {
+        // Left-click drops a marker at the picked world position; right-click = rotate
+        if (e.button === 0) {
+          // Try post raycast first (wins through splats)
+          const onPost = pickPostAt(e.clientX, e.clientY);
+          if (onPost) { placeMarker(onPost); return; }
+          if (!pickingPoints) {
+            if (currentSplat) setupPaintForSplat(currentSplat).catch(() => {});
+            return;
+          }
+          const hit = pickSplatAt(e.clientX, e.clientY);
+          if (hit) {
+            const snapped = snapToPostAxis(hit.worldPos);
+            placeMarker(snapped || hit.worldPos);
+          }
+          return;
+        }
+      }
       if (paintMode) {
-        // Left-click in paint mode = stamp; right-click = rotate (escape hatch)
         if (e.button === 0) {
           isPainting = true;
           applyBrushAtCursor(e.clientX, e.clientY);
@@ -1279,28 +1749,38 @@
       el.addEventListener("pointerleave", () => { pointerOverUI = false; });
     }
 
-    // ── WASD movement (per frame) — translates target so camera follows on the orbit
+    // ── WASD movement (per frame) — moves orbit target so camera follows. ──
+    // Perspective: free-flight (W/S along full view direction including Y) so
+    // you can fly down to ground level when looking down.
+    // Orthographic: horizontal-only on the XZ plane (depth is meaningless in
+    // parallel projection), Q/E adjusts altitude.
     function updateMovement(dt) {
       const speedBase = keysDown.has("ShiftLeft") || keysDown.has("ShiftRight")
         ? moveSpeed * 3.0
         : moveSpeed;
-      // Scale walking speed with distance so it feels right at any zoom
-      const speed = speedBase * Math.max(0.5, Math.min(20, cameraDistance / 5));
+      const distScale = cameraMode === "orthographic"
+        ? Math.max(0.5, Math.min(20, orthoSize / 5))
+        : Math.max(0.5, Math.min(20, cameraDistance / 5));
+      const speed = speedBase * distScale;
 
-      // Use current view-aligned forward/right (horizontal-only for walking),
-      // world up for vertical
       const forward = new THREE.Vector3(0, 0, -1).applyEuler(baseEuler);
       const right = new THREE.Vector3(1, 0, 0).applyEuler(baseEuler);
-      const fwdH = new THREE.Vector3(forward.x, 0, forward.z);
-      if (fwdH.lengthSq() > 1e-6) fwdH.normalize();
-      const rightH = new THREE.Vector3(right.x, 0, right.z);
-      if (rightH.lengthSq() > 1e-6) rightH.normalize();
+      let fwd, rgt;
+      if (cameraMode === "orthographic") {
+        fwd = new THREE.Vector3(forward.x, 0, forward.z);
+        rgt = new THREE.Vector3(right.x, 0, right.z);
+        if (fwd.lengthSq() > 1e-6) fwd.normalize();
+        if (rgt.lengthSq() > 1e-6) rgt.normalize();
+      } else {
+        fwd = forward; // already unit-length
+        rgt = right;
+      }
       const up = _worldUp;
 
-      if (keysDown.has("KeyW")) cameraTarget.addScaledVector(fwdH, speed * dt);
-      if (keysDown.has("KeyS")) cameraTarget.addScaledVector(fwdH, -speed * dt);
-      if (keysDown.has("KeyA")) cameraTarget.addScaledVector(rightH, -speed * dt);
-      if (keysDown.has("KeyD")) cameraTarget.addScaledVector(rightH, speed * dt);
+      if (keysDown.has("KeyW")) cameraTarget.addScaledVector(fwd, speed * dt);
+      if (keysDown.has("KeyS")) cameraTarget.addScaledVector(fwd, -speed * dt);
+      if (keysDown.has("KeyA")) cameraTarget.addScaledVector(rgt, -speed * dt);
+      if (keysDown.has("KeyD")) cameraTarget.addScaledVector(rgt, speed * dt);
       if (keysDown.has("KeyQ") || keysDown.has("Space")) cameraTarget.addScaledVector(up, speed * dt);
       if (keysDown.has("KeyE") || keysDown.has("ControlLeft")) cameraTarget.addScaledVector(up, -speed * dt);
     }
@@ -1412,6 +1892,40 @@
     let currentLabelingId = null;  // ID of the loaded labeling, null if working on a fresh one
     let currentLabelingName = null;
     let savedLabelingCount = 0;    // # of saved labelings matching current splat — drives panel visibility
+
+    // ── Markers state ──
+    // Ordered list of named point sets, each persisted independently from
+    // labelings. Each marker = 3D position + optional name; visuals = sphere
+    // mesh + numbered sprite label, connected in list order by a polyline.
+    let markerMode = false;
+    let markers = [];              // [{id, position: [x,y,z], name?: string}]
+    let currentMarkerSetId = null;
+    let currentMarkerSetName = null;
+    let savedMarkerSetCount = 0;
+    let markerGroup = null;        // contains spheres + sprites
+    let markerLine = null;         // THREE.Line connecting markers
+    let markerPreview = null;      // ghost sphere following cursor while in marker mode
+    let markerLabelsVisible = true;
+    let postLabelsVisible = true;
+    const MARKER_COLOR = 0xffaa00; // active-set sphere/line color (orange)
+    // Read-only overlays for additional saved marker sets shown alongside the active one.
+    // Map<setId, { data, group, line, colorHex }>
+    const displayedMarkerSets = new Map();
+
+    // ── Posts/objects state ──
+    // Vertical posts placed on the splat. Persisted as a single record per
+    // splat_source (auto-saved on every change). Markers snap to nearby post
+    // axes. Default cross-section: 4"×4" ≈ 0.1m. Default height: 4.5m.
+    let postMode = false;
+    let posts = [];                  // [{id, position:[x,y,z], height:number, name?:string, type:"post"}]
+    let postGroup = null;            // boxes + sprites
+    let postPreview = null;          // ghost vertical box following cursor
+    let defaultPostHeight = 4.5;
+    let splatUnitsPerMeter = 1.0;    // calibration: splat-unit-distance per real meter (scales post sizes + snap)
+    const POST_COLOR = 0xa0724a;     // light wood brown
+    const POST_SECTION_M = 0.1;      // ~4" cross-section in meters (rendered as POST_SECTION_M * splatUnitsPerMeter)
+    const POST_SNAP_RADIUS_M = 0.3;  // marker snap distance in meters
+    const POST_LABEL_OFFSET_M = 0.2; // sprite offset above post top, meters
     let targetDebugOverlay = null; // White-dots overlay of paint target (for visual alignment debug)
     let targetDebugVisible = false;
     const TREE_PALETTE_HUES = [0, 30, 60, 120, 180, 210, 270, 330, 15, 45, 75, 150, 195, 240, 300, 350];
@@ -1455,7 +1969,9 @@
     const DB_NAME = "hcsplat_files";
     const DB_STORE = "splats";
     const LABELINGS_STORE = "labelings";
-    const DB_VERSION = 2;
+    const MARKERS_STORE = "marker_sets";
+    const OBJECTS_STORE = "objects";  // posts (and future object types) keyed by splat_source
+    const DB_VERSION = 4;
     const posStatusEl = document.getElementById("pos-status");
 
     // ── IndexedDB: caches loaded splat files + saved labelings ──
@@ -1466,6 +1982,9 @@
           const db = req.result;
           if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
           if (!db.objectStoreNames.contains(LABELINGS_STORE)) db.createObjectStore(LABELINGS_STORE, { keyPath: "id" });
+          if (!db.objectStoreNames.contains(MARKERS_STORE)) db.createObjectStore(MARKERS_STORE, { keyPath: "id" });
+          // OBJECTS_STORE: one record per splat_source (used as keyPath), holds all posts/objects for that splat
+          if (!db.objectStoreNames.contains(OBJECTS_STORE)) db.createObjectStore(OBJECTS_STORE, { keyPath: "splat_source" });
         };
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
@@ -2033,6 +2552,12 @@
       updateBBoxDiagnostic();
       refreshSavedListUI();
       refreshTreesListUI();
+      // Reset markers state for the new splat (markers are coord-frame-bound)
+      clearAllMarkers();
+      clearAllOverlays();
+      refreshSavedMarkerListUI();
+      // Load any persisted posts for this splat
+      loadPostsForSplat();
 
       // Default grow Y-range to splat's full Y bbox so users with non-standard
       // coords (Y down, large negative values, etc.) don't have growth blocked
@@ -2973,6 +3498,713 @@
       setPaintStatus(`Deleted tree #${lbl} (${removed.toLocaleString()} splats)`);
     }
 
+    // ── Markers: visuals + ops + CRUD + UI ──
+    function makeNumberSprite(num, { inverted = false } = {}) {
+      const canvas = document.createElement("canvas");
+      const size = 96;
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      const fill = inverted ? "rgba(255,255,255,0.95)" : "rgba(0,0,0,0.85)";
+      const stroke = inverted ? "black" : "white";
+      const text = inverted ? "black" : "white";
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, size / 2 - 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = text;
+      ctx.font = "bold 44px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(num), size / 2, size / 2 + 2);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.needsUpdate = true;
+      const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true });
+      const sprite = new THREE.Sprite(mat);
+      sprite.renderOrder = 1001;
+      return sprite;
+    }
+
+    function ensureMarkerVisuals() {
+      if (!markerGroup) {
+        markerGroup = new THREE.Group();
+        markerGroup.renderOrder = 1000;
+        scene.add(markerGroup);
+      }
+      if (!markerLine) {
+        // Line2 renders instanced quad-segments so linewidth in pixels works
+        // (vanilla THREE.Line ignores linewidth on most WebGL implementations).
+        const geom = new LineGeometry();
+        geom.setPositions([0, 0, 0, 0, 0, 0]); // placeholder
+        const mat = new LineMaterial({
+          color: MARKER_COLOR,
+          linewidth: 2.5, // in screen pixels (resolution must be kept in sync)
+          resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
+          depthTest: false,
+          transparent: true,
+          opacity: 0.95,
+        });
+        markerLine = new Line2(geom, mat);
+        markerLine.frustumCulled = false;
+        markerLine.renderOrder = 999;
+        scene.add(markerLine);
+      }
+      if (!markerPreview) {
+        const geom = new THREE.SphereGeometry(1, 20, 14);
+        const mat = new THREE.MeshBasicMaterial({
+          color: MARKER_COLOR,
+          depthTest: false,
+          transparent: true,
+          opacity: 0.55,
+        });
+        markerPreview = new THREE.Mesh(geom, mat);
+        markerPreview.renderOrder = 1002;
+        markerPreview.visible = false;
+        markerPreview.frustumCulled = false;
+        scene.add(markerPreview);
+      }
+    }
+
+    const SNAP_COLOR = 0x86efac;   // green-ish — preview snapped to a post
+    function updateMarkerPreview(clientX, clientY) {
+      if (!markerMode) return;
+      ensureMarkerVisuals();
+      // 1. Try post raycast first — wins regardless of what splats are behind
+      const onPost = pickPostAt(clientX, clientY);
+      if (onPost) {
+        markerPreview.visible = true;
+        markerPreview.position.copy(onPost);
+        markerPreview.material.color.setHex(SNAP_COLOR);
+        return;
+      }
+      // 2. Fall back to splat picking, then proximity-snap to post axis
+      const hit = pickSplatAt(clientX, clientY);
+      if (!hit) {
+        markerPreview.visible = false;
+        return;
+      }
+      const proxSnap = snapToPostAxis(hit.worldPos);
+      markerPreview.visible = true;
+      if (proxSnap) {
+        markerPreview.position.copy(proxSnap);
+        markerPreview.material.color.setHex(SNAP_COLOR);
+      } else {
+        markerPreview.position.copy(hit.worldPos);
+        markerPreview.material.color.setHex(MARKER_COLOR);
+      }
+    }
+
+    function updatePostPreview(clientX, clientY) {
+      if (!postMode) return;
+      ensurePostVisuals();
+      const hit = pickSplatAt(clientX, clientY);
+      if (!hit) {
+        postPreview.visible = false;
+        return;
+      }
+      postPreview.visible = true;
+      postPreview.position.copy(hit.worldPos);
+    }
+
+    function rebuildMarkerVisuals() {
+      ensureMarkerVisuals();
+      // Tear down old children
+      while (markerGroup.children.length) {
+        const c = markerGroup.children.pop();
+        if (c.geometry) c.geometry.dispose();
+        if (c.material) {
+          if (c.material.map) c.material.map.dispose();
+          c.material.dispose();
+        }
+      }
+      // Build sphere + sprite per marker
+      const sphereGeom = new THREE.SphereGeometry(1, 16, 12);
+      for (let i = 0; i < markers.length; i++) {
+        const m = markers[i];
+        const sphereMat = new THREE.MeshBasicMaterial({ color: MARKER_COLOR, depthTest: false, transparent: true, opacity: 0.95 });
+        const sphere = new THREE.Mesh(sphereGeom, sphereMat);
+        sphere.scale.set(0.05, 0.05, 0.05); // initial; auto-scaled per frame
+        sphere.position.set(m.position[0], m.position[1], m.position[2]);
+        sphere.renderOrder = 1000;
+        sphere.userData = { kind: "markerSphere", markerId: m.id };
+        markerGroup.add(sphere);
+
+        const sprite = makeNumberSprite(i + 1);
+        sprite.position.set(m.position[0], m.position[1], m.position[2]);
+        sprite.userData = { kind: "markerLabel", markerId: m.id };
+        markerGroup.add(sprite);
+      }
+      // Connecting line — Line2 needs ≥2 points (uses setPositions API)
+      if (markers.length >= 2) {
+        const positions = new Array(markers.length * 3);
+        for (let i = 0; i < markers.length; i++) {
+          positions[i * 3]     = markers[i].position[0];
+          positions[i * 3 + 1] = markers[i].position[1];
+          positions[i * 3 + 2] = markers[i].position[2];
+        }
+        const lg = new LineGeometry();
+        lg.setPositions(positions);
+        markerLine.geometry.dispose();
+        markerLine.geometry = lg;
+        markerLine.computeLineDistances();
+        markerLine.visible = true;
+      } else {
+        markerLine.visible = false;
+      }
+      // Apply current label-visibility to freshly-created sprites
+      for (const c of markerGroup.children) if (c.isSprite) c.visible = markerLabelsVisible;
+    }
+
+    function setMarkerLabelsVisible(on) {
+      markerLabelsVisible = !!on;
+      if (markerGroup) {
+        for (const c of markerGroup.children) if (c.isSprite) c.visible = on;
+      }
+      for (const entry of displayedMarkerSets.values()) {
+        for (const c of entry.group.children) if (c.isSprite) c.visible = on;
+      }
+    }
+    function setPostLabelsVisible(on) {
+      postLabelsVisible = !!on;
+      if (postGroup) {
+        for (const c of postGroup.children) if (c.isSprite) c.visible = on;
+      }
+    }
+
+    function setIdToColorHex(id) {
+      // Stable HSL color from an FNV-1a-ish hash so a given set keeps its color across sessions
+      let h = 2166136261;
+      for (let i = 0; i < id.length; i++) {
+        h ^= id.charCodeAt(i);
+        h = Math.imul(h, 16777619) >>> 0;
+      }
+      const hue = (h % 360) / 360;
+      const c = new THREE.Color();
+      c.setHSL(hue, 0.7, 0.55);
+      return c.getHex();
+    }
+
+    function buildOverlayVisuals(data, colorHex) {
+      const group = new THREE.Group();
+      group.renderOrder = 1000;
+      const sphereGeom = new THREE.SphereGeometry(1, 16, 12);
+      for (let i = 0; i < (data.markers || []).length; i++) {
+        const m = data.markers[i];
+        const sphereMat = new THREE.MeshBasicMaterial({
+          color: colorHex, depthTest: false, transparent: true, opacity: 0.95,
+        });
+        const sphere = new THREE.Mesh(sphereGeom, sphereMat);
+        sphere.scale.set(0.05, 0.05, 0.05);
+        sphere.position.set(m.position[0], m.position[1], m.position[2]);
+        sphere.renderOrder = 1000;
+        group.add(sphere);
+        const sprite = makeNumberSprite(i + 1);
+        sprite.position.set(m.position[0], m.position[1], m.position[2]);
+        group.add(sprite);
+      }
+      let line = null;
+      if ((data.markers || []).length >= 2) {
+        const positions = [];
+        for (const m of data.markers) positions.push(m.position[0], m.position[1], m.position[2]);
+        const lg = new LineGeometry();
+        lg.setPositions(positions);
+        const mat = new LineMaterial({
+          color: colorHex, linewidth: 2.5,
+          resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
+          depthTest: false, transparent: true, opacity: 0.9,
+        });
+        line = new Line2(lg, mat);
+        line.frustumCulled = false;
+        line.renderOrder = 999;
+        line.computeLineDistances();
+      }
+      // Apply current label-visibility to freshly-created sprites
+      for (const c of group.children) if (c.isSprite) c.visible = markerLabelsVisible;
+      return { group, line };
+    }
+
+    function disposeOverlay(entry) {
+      if (entry.group) {
+        scene.remove(entry.group);
+        for (const c of entry.group.children) {
+          if (c.geometry) c.geometry.dispose();
+          if (c.material) {
+            if (c.material.map) c.material.map.dispose();
+            c.material.dispose();
+          }
+        }
+      }
+      if (entry.line) {
+        scene.remove(entry.line);
+        entry.line.geometry.dispose();
+        entry.line.material.dispose();
+      }
+    }
+
+    async function showOverlaySet(id) {
+      if (displayedMarkerSets.has(id)) return;
+      try {
+        const db = await openDB();
+        const tx = db.transaction(MARKERS_STORE, "readonly");
+        const req = tx.objectStore(MARKERS_STORE).get(id);
+        const data = await new Promise((r, j) => { req.onsuccess = () => r(req.result); req.onerror = () => j(req.error); });
+        if (!data) return;
+        const colorHex = setIdToColorHex(id);
+        const { group, line } = buildOverlayVisuals(data, colorHex);
+        scene.add(group);
+        if (line) scene.add(line);
+        displayedMarkerSets.set(id, { data, group, line, colorHex });
+      } catch (e) { console.error(e); }
+    }
+
+    function hideOverlaySet(id) {
+      const entry = displayedMarkerSets.get(id);
+      if (!entry) return;
+      disposeOverlay(entry);
+      displayedMarkerSets.delete(id);
+    }
+
+    function clearAllOverlays() {
+      for (const [, entry] of displayedMarkerSets) disposeOverlay(entry);
+      displayedMarkerSets.clear();
+    }
+
+    function placeMarker(worldPos) {
+      const id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
+      markers.push({ id, position: [worldPos.x, worldPos.y, worldPos.z], name: "" });
+      rebuildMarkerVisuals();
+      refreshMarkerListUI();
+    }
+
+    function removeMarker(id) {
+      const i = markers.findIndex(m => m.id === id);
+      if (i < 0) return;
+      markers.splice(i, 1);
+      rebuildMarkerVisuals();
+      refreshMarkerListUI();
+    }
+
+    function reorderMarker(fromIdx, toIdx) {
+      if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0 || fromIdx >= markers.length || toIdx >= markers.length) return;
+      const [m] = markers.splice(fromIdx, 1);
+      markers.splice(toIdx, 0, m);
+      rebuildMarkerVisuals();
+      refreshMarkerListUI();
+    }
+
+    function clearAllMarkers() {
+      markers = [];
+      currentMarkerSetId = null;
+      currentMarkerSetName = null;
+      rebuildMarkerVisuals();
+      refreshMarkerListUI();
+      updateCurrentMarkerSetUI();
+    }
+
+    function updateCurrentMarkerSetUI() {
+      const el = document.getElementById("current-marker-set");
+      if (!el) return;
+      if (currentMarkerSetId) {
+        el.innerHTML = `Editing: <span style="color:#86efac;">${escapeHtml(currentMarkerSetName || "(unnamed)")}</span>`;
+      } else {
+        el.innerHTML = `Editing: <span style="color:#a0a0a0;">unsaved</span>`;
+      }
+    }
+
+    // ── Marker-set CRUD ──
+    async function listMarkerSets() {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(MARKERS_STORE, "readonly");
+        const req = tx.objectStore(MARKERS_STORE).getAll();
+        return await new Promise((r, j) => { req.onsuccess = () => r(req.result || []); req.onerror = () => j(req.error); });
+      } catch (e) { console.warn(e); return []; }
+    }
+
+    async function saveMarkerSet(name, { overwriteId = null } = {}) {
+      const id = overwriteId || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
+      const data = {
+        id, name,
+        splat_source: currentModelName,
+        created: Date.now(),
+        markers: markers.map(m => ({ id: m.id, position: [...m.position], name: m.name || "" })),
+      };
+      try {
+        const db = await openDB();
+        const tx = db.transaction(MARKERS_STORE, "readwrite");
+        tx.objectStore(MARKERS_STORE).put(data);
+        await new Promise((r, j) => { tx.oncomplete = r; tx.onerror = () => j(tx.error); });
+        currentMarkerSetId = id;
+        currentMarkerSetName = name;
+        updateCurrentMarkerSetUI();
+        await refreshSavedMarkerListUI();
+        showStatus(overwriteId ? `Updated "${name}"` : `Saved "${name}"`);
+      } catch (e) { console.error(e); showStatus("Save failed: " + e.message); }
+    }
+
+    async function loadMarkerSet(id) {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(MARKERS_STORE, "readonly");
+        const req = tx.objectStore(MARKERS_STORE).get(id);
+        const data = await new Promise((r, j) => { req.onsuccess = () => r(req.result); req.onerror = () => j(req.error); });
+        if (!data) return;
+        if (data.splat_source !== currentModelName) {
+          if (!confirm(`Saved for "${data.splat_source}", current is "${currentModelName}". Load anyway?`)) return;
+        }
+        markers = (data.markers || []).map(m => ({ id: m.id, position: [...m.position], name: m.name || "" }));
+        currentMarkerSetId = data.id;
+        currentMarkerSetName = data.name;
+        rebuildMarkerVisuals();
+        refreshMarkerListUI();
+        updateCurrentMarkerSetUI();
+        await refreshSavedMarkerListUI();
+        showStatus(`Loaded "${data.name}"`);
+      } catch (e) { console.error(e); showStatus("Load failed: " + e.message); }
+    }
+
+    async function deleteMarkerSet(id) {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(MARKERS_STORE, "readwrite");
+        tx.objectStore(MARKERS_STORE).delete(id);
+        await new Promise((r, j) => { tx.oncomplete = r; tx.onerror = () => j(tx.error); });
+        if (currentMarkerSetId === id) {
+          currentMarkerSetId = null;
+          currentMarkerSetName = null;
+          updateCurrentMarkerSetUI();
+        }
+        await refreshSavedMarkerListUI();
+      } catch (e) { console.error(e); }
+    }
+
+    async function renameMarkerSet(id, newName) {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(MARKERS_STORE, "readwrite");
+        const store = tx.objectStore(MARKERS_STORE);
+        const req = store.get(id);
+        const data = await new Promise((r, j) => { req.onsuccess = () => r(req.result); req.onerror = () => j(req.error); });
+        if (!data) return;
+        data.name = newName;
+        store.put(data);
+        await new Promise((r, j) => { tx.oncomplete = r; tx.onerror = () => j(tx.error); });
+        if (currentMarkerSetId === id) {
+          currentMarkerSetName = newName;
+          updateCurrentMarkerSetUI();
+        }
+        await refreshSavedMarkerListUI();
+      } catch (e) { console.error(e); }
+    }
+
+    function updateMarkersPanelVisibility() {
+      const panel = document.getElementById("markers-panel");
+      if (!panel) return;
+      panel.style.display = (markerMode || markers.length > 0 || savedMarkerSetCount > 0) ? "block" : "none";
+    }
+
+    async function refreshSavedMarkerListUI() {
+      const list = document.getElementById("saved-marker-list");
+      if (!list) return;
+      const all = await listMarkerSets();
+      const matches = all.filter(s => s.splat_source === currentModelName);
+      savedMarkerSetCount = matches.length;
+      updateMarkersPanelVisibility();
+      list.innerHTML = "";
+      if (matches.length === 0) {
+        list.innerHTML = '<div class="empty">No saved sets for this splat</div>';
+        return;
+      }
+      matches.sort((a, b) => b.created - a.created);
+      for (const s of matches) {
+        const dateStr = new Date(s.created).toISOString().slice(0, 10);
+        const isLoaded = s.id === currentMarkerSetId;
+        const isShown = displayedMarkerSets.has(s.id);
+        const colorHex = setIdToColorHex(s.id);
+        const colorCss = "#" + colorHex.toString(16).padStart(6, "0");
+        const row = document.createElement("div");
+        row.className = "saved-row";
+        if (isLoaded) row.style.borderColor = "rgba(134,239,172,0.5)";
+        // Eye-toggle button — hidden for the active set (it's always rendered via active group).
+        // Filled circle (●) when overlay is on, hollow (○) when off, colored to match the line color.
+        const eyeBtn = isLoaded
+          ? ''
+          : `<button class="btn-mini" data-act="toggle-show" data-id="${s.id}" title="Show alongside" style="${isShown ? `color:${colorCss};border-color:${colorCss};` : ""}">${isShown ? "●" : "○"}</button>`;
+        row.innerHTML = `
+          <span class="saved-name">${isLoaded ? "● " : ""}${escapeHtml(s.name)}</span>
+          ${eyeBtn}
+          <button class="btn-mini" data-act="load" data-id="${s.id}" title="Load (edit)">▶</button>
+          <button class="btn-mini" data-act="rename" data-id="${s.id}" title="Rename">✏</button>
+          <button class="btn-mini" data-act="delete" data-id="${s.id}" title="Delete">×</button>
+          <span class="saved-meta">${(s.markers || []).length} markers · ${dateStr}</span>
+        `;
+        list.appendChild(row);
+      }
+    }
+
+    function refreshMarkerListUI() {
+      const list = document.getElementById("marker-list");
+      if (!list) return;
+      list.innerHTML = "";
+      if (markers.length === 0) {
+        list.innerHTML = '<div class="empty">No wiring — click on splat to drop</div>';
+        updateMarkersPanelVisibility();
+        return;
+      }
+      for (let i = 0; i < markers.length; i++) {
+        const m = markers[i];
+        const row = document.createElement("div");
+        row.className = "marker-row";
+        row.draggable = true;
+        row.dataset.id = m.id;
+        row.dataset.idx = i;
+        row.innerHTML = `
+          <span class="marker-handle" title="Drag to reorder">≡</span>
+          <span class="marker-num">#${i + 1}</span>
+          <input type="text" class="marker-name" data-id="${m.id}" value="${escapeHtml(m.name || "")}" placeholder="(unnamed)" />
+          <button class="marker-del" data-id="${m.id}" title="Delete">×</button>
+        `;
+        list.appendChild(row);
+      }
+      updateMarkersPanelVisibility();
+    }
+
+    // ── Posts/objects ──
+    function ensurePostVisuals() {
+      if (!postGroup) {
+        postGroup = new THREE.Group();
+        scene.add(postGroup);
+      }
+      if (!postPreview) {
+        const sec = POST_SECTION_M * splatUnitsPerMeter;
+        const h = defaultPostHeight * splatUnitsPerMeter;
+        const geom = new THREE.BoxGeometry(sec, h, sec);
+        geom.translate(0, h / 2, 0);
+        const mat = new THREE.MeshBasicMaterial({
+          color: POST_COLOR, transparent: true, opacity: 0.45, depthTest: false,
+        });
+        postPreview = new THREE.Mesh(geom, mat);
+        postPreview.renderOrder = 998;
+        postPreview.frustumCulled = false;
+        postPreview.visible = false;
+        scene.add(postPreview);
+      }
+    }
+
+    function updatePostPreviewGeometry() {
+      if (!postPreview) return;
+      postPreview.geometry.dispose();
+      const sec = POST_SECTION_M * splatUnitsPerMeter;
+      const h = defaultPostHeight * splatUnitsPerMeter;
+      const g = new THREE.BoxGeometry(sec, h, sec);
+      g.translate(0, h / 2, 0);
+      postPreview.geometry = g;
+    }
+
+    function rebuildPostVisuals() {
+      ensurePostVisuals();
+      // Tear down old children
+      while (postGroup.children.length) {
+        const c = postGroup.children.pop();
+        if (c.geometry) c.geometry.dispose();
+        if (c.material) {
+          if (c.material.map) c.material.map.dispose();
+          c.material.dispose();
+        }
+      }
+      const sec = POST_SECTION_M * splatUnitsPerMeter;
+      for (let i = 0; i < posts.length; i++) {
+        const p = posts[i];
+        const h = p.height * splatUnitsPerMeter;
+        const g = new THREE.BoxGeometry(sec, h, sec);
+        g.translate(0, h / 2, 0);
+        const mat = new THREE.MeshBasicMaterial({
+          color: POST_COLOR, transparent: true, opacity: 0.92,
+        });
+        const mesh = new THREE.Mesh(g, mat);
+        mesh.position.set(p.position[0], p.position[1], p.position[2]);
+        mesh.userData = { kind: "post", id: p.id };
+        postGroup.add(mesh);
+        // Numbered sprite floating slightly above the post top (inverted style for objects)
+        const sprite = makeNumberSprite(i + 1, { inverted: true });
+        sprite.position.set(p.position[0], p.position[1] + h + POST_LABEL_OFFSET_M * splatUnitsPerMeter, p.position[2]);
+        sprite.userData = { kind: "postLabel", id: p.id };
+        postGroup.add(sprite);
+      }
+      for (const c of postGroup.children) if (c.isSprite) c.visible = postLabelsVisible;
+    }
+
+    async function persistPosts() {
+      if (!currentModelName) return;
+      try {
+        const db = await openDB();
+        const tx = db.transaction(OBJECTS_STORE, "readwrite");
+        tx.objectStore(OBJECTS_STORE).put({
+          splat_source: currentModelName,
+          posts: posts.map(p => ({
+            id: p.id, position: [...p.position], height: p.height, name: p.name || "", type: "post",
+          })),
+          default_post_height: defaultPostHeight,
+          splat_units_per_meter: splatUnitsPerMeter,
+        });
+        await new Promise((r, j) => { tx.oncomplete = r; tx.onerror = () => j(tx.error); });
+      } catch (e) { console.warn("persistPosts:", e); }
+    }
+
+    async function loadPostsForSplat() {
+      if (!currentModelName) return;
+      posts = [];
+      try {
+        const db = await openDB();
+        const tx = db.transaction(OBJECTS_STORE, "readonly");
+        const req = tx.objectStore(OBJECTS_STORE).get(currentModelName);
+        const data = await new Promise((r, j) => { req.onsuccess = () => r(req.result); req.onerror = () => j(req.error); });
+        if (data) {
+          posts = (data.posts || []).map(p => ({
+            id: p.id, position: [...p.position], height: p.height, name: p.name || "", type: "post",
+          }));
+          if (typeof data.default_post_height === "number") {
+            defaultPostHeight = data.default_post_height;
+            const inp = document.getElementById("post-default-height");
+            if (inp) inp.value = String(defaultPostHeight);
+          }
+          if (typeof data.splat_units_per_meter === "number") {
+            splatUnitsPerMeter = data.splat_units_per_meter;
+            const inp = document.getElementById("post-scale");
+            if (inp) inp.value = String(splatUnitsPerMeter);
+          }
+          updatePostPreviewGeometry();
+        }
+      } catch (e) { console.warn("loadPostsForSplat:", e); }
+      rebuildPostVisuals();
+      refreshPostListUI();
+      updatePostsPanelVisibility();
+    }
+
+    function updatePostsPanelVisibility() {
+      const panel = document.getElementById("posts-panel");
+      if (!panel) return;
+      panel.style.display = (postMode || posts.length > 0) ? "block" : "none";
+    }
+
+    function placePost(worldPos) {
+      const id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
+      posts.push({
+        id,
+        position: [worldPos.x, worldPos.y, worldPos.z],
+        height: defaultPostHeight,
+        name: "",
+        type: "post",
+      });
+      rebuildPostVisuals();
+      refreshPostListUI();
+      updatePostsPanelVisibility();
+      persistPosts();
+    }
+
+    function removePost(id) {
+      const i = posts.findIndex(p => p.id === id);
+      if (i < 0) return;
+      posts.splice(i, 1);
+      rebuildPostVisuals();
+      refreshPostListUI();
+      updatePostsPanelVisibility();
+      persistPosts();
+    }
+
+    function updatePostField(id, field, value) {
+      const p = posts.find(x => x.id === id);
+      if (!p) return;
+      if (field === "height") {
+        p.height = Math.max(0.1, parseFloat(value) || 0.1);
+        rebuildPostVisuals();
+      } else if (field === "name") {
+        p.name = value;
+      }
+      persistPosts();
+    }
+
+    function clearAllPosts() {
+      posts = [];
+      rebuildPostVisuals();
+      refreshPostListUI();
+      updatePostsPanelVisibility();
+      persistPosts();
+    }
+
+    function refreshPostListUI() {
+      const list = document.getElementById("post-list");
+      if (!list) return;
+      list.innerHTML = "";
+      if (posts.length === 0) {
+        list.innerHTML = '<div class="empty">No objects — click on splat to drop</div>';
+        return;
+      }
+      for (let i = 0; i < posts.length; i++) {
+        const p = posts[i];
+        const row = document.createElement("div");
+        row.className = "post-row";
+        row.innerHTML = `
+          <span class="post-num">#${i + 1}</span>
+          <input type="text" data-id="${p.id}" data-field="name" value="${escapeHtml(p.name || "")}" placeholder="(unnamed)" />
+          <input type="number" data-id="${p.id}" data-field="height" step="0.1" min="0.1" value="${p.height}" title="Height (m)" />
+          <button class="post-del" data-id="${p.id}" title="Delete">×</button>
+        `;
+        list.appendChild(row);
+      }
+    }
+
+    // Direct raycast against post meshes — used in marker mode so the cursor
+    // ON a post always picks the post even if splats render in front of it.
+    // Splats use depthWrite:false so they don't block raycasting either, but
+    // the splat-pickbuffer doesn't know about post geometry.
+    const _markerRaycaster = new THREE.Raycaster();
+    const _markerNdc = new THREE.Vector2();
+    function pickPostAt(clientX, clientY) {
+      if (!postGroup || posts.length === 0) return null;
+      const rect = renderer.domElement.getBoundingClientRect();
+      _markerNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      _markerNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      _markerRaycaster.setFromCamera(_markerNdc, getActiveCamera());
+      const targets = postGroup.children.filter(c => c.isMesh && c.userData && c.userData.kind === "post");
+      const hits = _markerRaycaster.intersectObjects(targets, false);
+      if (hits.length === 0) return null;
+      const hit = hits[0];
+      const postId = hit.object.userData.id;
+      const post = posts.find(p => p.id === postId);
+      if (!post) return null;
+      // Snap hit point to the post's vertical axis, clamped to its span
+      const px = post.position[0], py = post.position[1], pz = post.position[2];
+      const yLo = py, yHi = py + post.height * splatUnitsPerMeter;
+      const cy = Math.max(yLo, Math.min(yHi, hit.point.y));
+      return new THREE.Vector3(px, cy, pz);
+    }
+
+    // Snap a world position to the nearest visible post axis if within radius.
+    // Returns the snapped position (Vector3) or null if no post is near.
+    function snapToPostAxis(worldPos) {
+      let bestD = POST_SNAP_RADIUS_M * splatUnitsPerMeter;
+      let bestSnap = null;
+      for (const p of posts) {
+        const px = p.position[0], py = p.position[1], pz = p.position[2];
+        const hScaled = p.height * splatUnitsPerMeter;
+        const yLo = py, yHi = py + hScaled;
+        const cy = Math.max(yLo, Math.min(yHi, worldPos.y));
+        const dx = worldPos.x - px;
+        const dy = worldPos.y - cy;
+        const dz = worldPos.z - pz;
+        const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (d < bestD) {
+          bestD = d;
+          bestSnap = new THREE.Vector3(px, cy, pz);
+        }
+      }
+      return bestSnap;
+    }
+
     async function loadGeometryCloud(file) {
       if (!currentSplat || !splatCenters) {
         setPaintStatus("Load a splat first", "#dc2626");
@@ -3263,6 +4495,41 @@
       detectFace();
       updateCamera();
 
+      // Scale marker spheres + sprites by distance to camera so they stay
+      // visually consistent at any zoom (~4% of view distance per pixel).
+      const camPos = camera.position;
+      if (markerGroup && markerGroup.children.length > 0) {
+        for (const child of markerGroup.children) {
+          const d = child.position.distanceTo(camPos);
+          const k = Math.max(0.01, d * 0.04);
+          if (child.isSprite) child.scale.set(k, k, 1);
+          else child.scale.set(k * 0.1, k * 0.1, k * 0.1);
+        }
+      }
+      if (markerPreview && markerPreview.visible) {
+        const d = markerPreview.position.distanceTo(camPos);
+        const k = Math.max(0.01, d * 0.04);
+        markerPreview.scale.set(k * 0.1, k * 0.1, k * 0.1);
+      }
+      for (const entry of displayedMarkerSets.values()) {
+        for (const child of entry.group.children) {
+          const d = child.position.distanceTo(camPos);
+          const k = Math.max(0.01, d * 0.04);
+          if (child.isSprite) child.scale.set(k, k, 1);
+          else child.scale.set(k * 0.1, k * 0.1, k * 0.1);
+        }
+      }
+      // Post sprites scale with distance; post boxes have fixed world-size geometry.
+      if (postGroup) {
+        for (const child of postGroup.children) {
+          if (child.isSprite) {
+            const d = child.position.distanceTo(camPos);
+            const k = Math.max(0.01, d * 0.04);
+            child.scale.set(k, k, 1);
+          }
+        }
+      }
+
       const activeCam = getActiveCamera();
       if (compareMode && currentSplat && currentSplatB) {
         // Side-by-side comparison via WebGL scissor test.
@@ -3315,6 +4582,14 @@
       orthoCam.top = orthoSize;
       orthoCam.bottom = -orthoSize;
       orthoCam.updateProjectionMatrix();
+      if (markerLine && markerLine.material && markerLine.material.resolution) {
+        markerLine.material.resolution.set(window.innerWidth, window.innerHeight);
+      }
+      for (const entry of displayedMarkerSets.values()) {
+        if (entry.line && entry.line.material && entry.line.material.resolution) {
+          entry.line.material.resolution.set(window.innerWidth, window.innerHeight);
+        }
+      }
     });
 
     // ── Init ──
