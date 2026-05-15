@@ -749,6 +749,14 @@
       <button class="btn" id="btn-recenter" title="Frame the splat in view">Recenter</button>
       <button class="btn" id="btn-reset-pos">Reset</button>
     </div>
+    <div class="btn-row" style="margin-top:8px;align-items:stretch;">
+      <select id="bookmarks-dropdown" title="Global camera bookmarks — apply to any splat"
+        style="flex:1;background:#0a0a0a;border:1px solid #2a2a2e;border-radius:6px;padding:5px 8px;font-size:11px;color:#e4e4e7;font-family:inherit;min-width:0;">
+        <option value="">(bookmarks)</option>
+      </select>
+      <button class="btn" id="btn-save-bookmark" title="Save current camera + model rotation as a named bookmark" style="padding:5px 10px;">+</button>
+      <button class="btn" id="btn-delete-bookmark" title="Delete selected bookmark" style="padding:5px 10px;">×</button>
+    </div>
     <div id="pos-status" style="font-size:10px;color:#666;margin-top:6px;height:14px;"></div>
 
     <!-- Compare splats -->
@@ -2082,6 +2090,85 @@
     document.getElementById("btn-save-pos").addEventListener("click", savePosition);
     document.getElementById("btn-reset-pos").addEventListener("click", resetPosition);
 
+    // ── Global camera bookmarks ──
+    // Cross-splat camera positions. Stored as a flat array in localStorage so they
+    // can be applied to any loaded splat. Each entry remembers which splat it was
+    // saved from (hint in dropdown — useful when frames don't match).
+    const BOOKMARKS_KEY = "hcsplat_bookmarks";
+    let bookmarks = [];
+    try { bookmarks = JSON.parse(localStorage.getItem(BOOKMARKS_KEY) || "[]"); }
+    catch { bookmarks = []; }
+
+    function persistBookmarks() {
+      localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(bookmarks));
+    }
+    function refreshBookmarksDropdown() {
+      const sel = document.getElementById("bookmarks-dropdown");
+      if (!sel) return;
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">(bookmarks)</option>';
+      for (const b of bookmarks) {
+        const opt = document.createElement("option");
+        opt.value = b.id;
+        const hint = b.splatSource && b.splatSource !== currentModelName ? ` ⟵ ${b.splatSource}` : "";
+        opt.textContent = `${b.name}${hint}`;
+        sel.appendChild(opt);
+      }
+      if (prev && bookmarks.some(b => b.id === prev)) sel.value = prev;
+    }
+    function saveBookmark() {
+      const defaultName = `${currentModelName.replace(/\.[^.]+$/, "")} · ${new Date().toISOString().slice(0,16).replace("T", " ")}`;
+      const name = prompt("Bookmark name:", defaultName);
+      if (!name || !name.trim()) return;
+      bookmarks.push({
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(),
+        name: name.trim(),
+        splatSource: currentModelName,
+        target: [cameraTarget.x, cameraTarget.y, cameraTarget.z],
+        distance: cameraDistance,
+        azimuth: cameraAzimuth,
+        elevation: cameraElevation,
+        modelRot: [modelRotX, modelRotY, modelRotZ],
+        created: Date.now(),
+      });
+      persistBookmarks();
+      refreshBookmarksDropdown();
+      showStatus(`Bookmark saved: ${name.trim()}`);
+    }
+    function applyBookmark(id) {
+      const b = bookmarks.find(x => x.id === id);
+      if (!b) return;
+      cameraTarget.set(b.target[0], b.target[1], b.target[2]);
+      cameraDistance = b.distance;
+      cameraAzimuth = b.azimuth;
+      cameraElevation = b.elevation;
+      if (b.modelRot) setModelRotationSliders(b.modelRot[0], b.modelRot[1], b.modelRot[2]);
+      const sameSplat = b.splatSource === currentModelName;
+      showStatus(`Loaded "${b.name}"${sameSplat ? "" : ` (from ${b.splatSource})`}`);
+    }
+    function deleteBookmark(id) {
+      const b = bookmarks.find(x => x.id === id);
+      if (!b) return;
+      if (!confirm(`Delete bookmark "${b.name}"?`)) return;
+      bookmarks = bookmarks.filter(x => x.id !== id);
+      persistBookmarks();
+      refreshBookmarksDropdown();
+    }
+
+    document.getElementById("btn-save-bookmark").addEventListener("click", saveBookmark);
+    document.getElementById("btn-delete-bookmark").addEventListener("click", () => {
+      const sel = document.getElementById("bookmarks-dropdown");
+      if (sel.value) deleteBookmark(sel.value);
+    });
+    document.getElementById("bookmarks-dropdown").addEventListener("change", (e) => {
+      if (e.target.value) {
+        applyBookmark(e.target.value);
+        // Reset to (bookmarks) so the same one can be re-applied later by selecting again
+        e.target.value = "";
+      }
+    });
+    refreshBookmarksDropdown();
+
     // Recenter: frame the splat in view by computing its world bbox + placing
     // the camera at a distance such that the splat fits the FOV (with 20% margin).
     // Doesn't touch saved positions or the model rotation sliders.
@@ -2160,6 +2247,8 @@
 
         // Build CPU-side position mirror + picking infrastructure for tree painting
         setupPaintForSplat(splat).catch(err => console.warn("Paint setup failed:", err));
+        // Refresh bookmark labels (hint depends on currentModelName)
+        if (typeof refreshBookmarksDropdown === "function") refreshBookmarksDropdown();
 
         // Remember this model
         rememberLastModel(currentModelName, remoteUrl || null);
