@@ -745,6 +745,12 @@
       <button class="btn" id="btn-pause">Pause</button>
       <button class="btn" id="btn-load">Load .spz/.ply</button>
     </div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:11px;color:#a0a0a0;margin-top:6px;">
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+        <input type="checkbox" id="splat-visible" style="margin:0;" checked>
+        Show splat
+      </label>
+    </div>
     <div class="btn-row" style="margin-top:8px;">
       <button class="btn" id="btn-save-pos" style="flex:1;">Save position</button>
       <button class="btn" id="btn-recenter" title="Frame the splat in view">Recenter</button>
@@ -1182,6 +1188,31 @@
     });
 
     document.getElementById("btn-load").addEventListener("click", () => fileInput.click());
+
+    const splatVisibleCb = document.getElementById("splat-visible");
+    splatVisibleCb.addEventListener("change", () => {
+      const v = splatVisibleCb.checked;
+      // Reparent point cloud so it stays visible regardless of splat state.
+      // SplatMesh.visible=false propagates to children, so we move it to the
+      // scene root (copying world transform) when hiding, and back as a child
+      // when re-showing so model-rotation sliders keep working on both.
+      if (currentPointCloud) {
+        if (!v && currentPointCloud.parent === currentSplat) {
+          currentSplat.updateMatrixWorld(true);
+          currentPointCloud.applyMatrix4(currentSplat.matrixWorld);
+          currentSplat.remove(currentPointCloud);
+          scene.add(currentPointCloud);
+        } else if (v && currentPointCloud.parent === scene && currentSplat) {
+          currentSplat.updateMatrixWorld(true);
+          const inv = currentSplat.matrixWorld.clone().invert();
+          currentPointCloud.applyMatrix4(inv);
+          scene.remove(currentPointCloud);
+          currentSplat.add(currentPointCloud);
+        }
+      }
+      if (currentSplat) currentSplat.visible = v;
+      if (currentSplatB) currentSplatB.visible = v;
+    });
     fileInput.addEventListener("change", (e) => {
       const file = e.target.files[0];
       if (file) loadSplatFile(file);
@@ -2387,6 +2418,7 @@
           : new SplatMesh({ url });
         scene.add(splat);
         currentSplat = splat;
+        splat.visible = splatVisibleCb.checked;
         if (carriedPointCloud) splat.add(carriedPointCloud);
         await new Promise((r) => setTimeout(r, 2000));
         loadingEl.classList.add("fade-out");
