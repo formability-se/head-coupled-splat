@@ -779,6 +779,12 @@
         <label style="display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="checkbox" id="pc-flip-z" style="margin:0;">Z</label>
         <button class="btn" id="btn-pc-cv-preset" title="OpenCV→OpenGL: flip Y & Z" style="margin-left:auto;padding:3px 8px;font-size:10px;">CV→GL</button>
       </div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:11px;color:#a0a0a0;margin-top:6px;">
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+          <input type="checkbox" id="pc-vertex-colors" style="margin:0;" checked>
+          Use point colors from PLY
+        </label>
+      </div>
     </div>
 
     <!-- Compare splats -->
@@ -1372,6 +1378,16 @@
       applyPointCloudFlips();
     });
 
+    const pcVertexColorsCb = document.getElementById("pc-vertex-colors");
+    pcVertexColorsCb.addEventListener("change", () => {
+      if (!currentPointCloud) return;
+      const hasColor = !!currentPointCloud.geometry.getAttribute("color");
+      const useColor = pcVertexColorsCb.checked && hasColor;
+      currentPointCloud.material.vertexColors = useColor;
+      currentPointCloud.material.color.set(useColor ? 0xffffff : 0xffffff);
+      currentPointCloud.material.needsUpdate = true;
+    });
+
     async function loadPointCloudOverlay(file) {
       pointCloudStatus.textContent = `Reading ${file.name}…`;
       let parsed;
@@ -1397,15 +1413,20 @@
         for (let i = 0; i < cf.length; i++) cf[i] = parsed.colors[i] / 255;
         geom.setAttribute("color", new THREE.BufferAttribute(cf, 3));
       }
+      const useColor = !!parsed.colors && pcVertexColorsCb.checked;
       const mat = new THREE.PointsMaterial({
         size: parseFloat(pcSizeSlider.value),
         sizeAttenuation: false,
-        vertexColors: !!parsed.colors,
-        color: parsed.colors ? 0xffffff : 0xffffff,
+        vertexColors: useColor,
+        color: 0xffffff,
         transparent: false,
         depthTest: true,
         depthWrite: true,
       });
+      // Disable the toggle if this PLY had no color data
+      pcVertexColorsCb.disabled = !parsed.colors;
+      pcVertexColorsCb.parentElement.style.opacity = parsed.colors ? "1" : "0.5";
+      pcVertexColorsCb.parentElement.title = parsed.colors ? "" : "This PLY has no color data";
       const points = new THREE.Points(geom, mat);
       points.frustumCulled = false;
       // Parent to the splat so model rotation/recenter applies to both. If no
