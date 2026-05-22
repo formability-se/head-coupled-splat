@@ -227,7 +227,8 @@
     /* File inputs — off-screen instead of display:none so Chrome on macOS opens picker reliably */
     #file-input,
     #file-input-b,
-    #file-input-cloud {
+    #file-input-cloud,
+    #file-input-pointcloud {
       position: absolute;
       left: -9999px;
       width: 1px;
@@ -759,6 +760,27 @@
     </div>
     <div id="pos-status" style="font-size:10px;color:#666;margin-top:6px;height:14px;"></div>
 
+    <!-- Point cloud overlay (separate from paint-target geometry below) -->
+    <div style="margin-top:10px;border-top:1px solid #2a2a2e;padding-top:10px;">
+      <div class="btn-row" style="margin-top:0;">
+        <button class="btn" id="btn-load-pointcloud" style="flex:1;" title="Load a .ply point cloud and render it alongside the splat">Load point cloud .ply</button>
+        <button class="btn" id="btn-clear-pointcloud" title="Remove the loaded point cloud" style="padding:5px 10px;">×</button>
+      </div>
+      <div id="pointcloud-status" style="font-size:10px;color:#666;margin-top:4px;line-height:1.3;">No point cloud loaded</div>
+      <div class="control-row" style="margin-top:6px;">
+        <label>Point size</label>
+        <span class="val" id="pc-size-val">2</span>
+      </div>
+      <input type="range" id="pc-size" min="1" max="10" step="0.5" value="2" />
+      <div style="display:flex;gap:8px;align-items:center;font-size:11px;color:#a0a0a0;margin-top:8px;">
+        <span>Flip:</span>
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="checkbox" id="pc-flip-x" style="margin:0;">X</label>
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="checkbox" id="pc-flip-y" style="margin:0;">Y</label>
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="checkbox" id="pc-flip-z" style="margin:0;">Z</label>
+        <button class="btn" id="btn-pc-cv-preset" title="OpenCV→OpenGL: flip Y & Z" style="margin-left:auto;padding:3px 8px;font-size:10px;">CV→GL</button>
+      </div>
+    </div>
+
     <!-- Compare splats -->
     <div style="margin-top:14px;border-top:1px solid #2a2a2e;padding-top:12px;">
       <button class="btn" id="btn-compare-toggle" style="width:100%;">Compare with second splat</button>
@@ -874,6 +896,7 @@
   <input type="file" id="file-input" accept=".spz,.ply,.splat,.ksplat,.sogs,.sog" />
   <input type="file" id="file-input-b" accept=".spz,.ply,.splat,.ksplat,.sogs,.sog" />
   <input type="file" id="file-input-cloud" accept=".ply" />
+  <input type="file" id="file-input-pointcloud" accept=".ply" />
   <!-- Posts/objects panel: vertical posts placed on the splat, used as snap-targets for markers -->
   <div id="posts-panel">
     <h3>Objects</h3>
@@ -1307,6 +1330,105 @@
       fileInputCloud.value = ""; // allow reloading same file
     });
     document.getElementById("btn-clear-cloud").addEventListener("click", clearGeometryCloud);
+
+    // ── Point cloud overlay (visualization, independent of paint geometry) ──
+    let currentPointCloud = null;
+    let pointCloudName = null;
+    const fileInputPointCloud = document.getElementById("file-input-pointcloud");
+    const pointCloudStatus = document.getElementById("pointcloud-status");
+    const pcSizeSlider = document.getElementById("pc-size");
+    const pcSizeVal = document.getElementById("pc-size-val");
+    document.getElementById("btn-load-pointcloud").addEventListener("click", () => fileInputPointCloud.click());
+    fileInputPointCloud.addEventListener("change", async (e) => {
+      const f = e.target.files[0];
+      if (f) await loadPointCloudOverlay(f);
+      fileInputPointCloud.value = "";
+    });
+    document.getElementById("btn-clear-pointcloud").addEventListener("click", clearPointCloudOverlay);
+    pcSizeSlider.addEventListener("input", () => {
+      const v = parseFloat(pcSizeSlider.value);
+      pcSizeVal.textContent = v.toString();
+      if (currentPointCloud) currentPointCloud.material.size = v;
+    });
+
+    const pcFlipX = document.getElementById("pc-flip-x");
+    const pcFlipY = document.getElementById("pc-flip-y");
+    const pcFlipZ = document.getElementById("pc-flip-z");
+    function applyPointCloudFlips() {
+      if (!currentPointCloud) return;
+      currentPointCloud.scale.set(
+        pcFlipX.checked ? -1 : 1,
+        pcFlipY.checked ? -1 : 1,
+        pcFlipZ.checked ? -1 : 1,
+      );
+    }
+    pcFlipX.addEventListener("change", applyPointCloudFlips);
+    pcFlipY.addEventListener("change", applyPointCloudFlips);
+    pcFlipZ.addEventListener("change", applyPointCloudFlips);
+    document.getElementById("btn-pc-cv-preset").addEventListener("click", () => {
+      pcFlipX.checked = false;
+      pcFlipY.checked = true;
+      pcFlipZ.checked = true;
+      applyPointCloudFlips();
+    });
+
+    async function loadPointCloudOverlay(file) {
+      pointCloudStatus.textContent = `Reading ${file.name}…`;
+      let parsed;
+      try {
+        const buf = await file.arrayBuffer();
+        parsed = parsePly(buf);
+      } catch (err) {
+        console.error("Point cloud PLY parse failed:", err);
+        pointCloudStatus.textContent = `Parse failed: ${err.message}`;
+        return;
+      }
+      if (!parsed.count) {
+        pointCloudStatus.textContent = "PLY has no vertices";
+        return;
+      }
+      clearPointCloudOverlay();
+
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute("position", new THREE.BufferAttribute(parsed.positions, 3));
+      if (parsed.colors) {
+        // PLY stores 0–255 bytes; convert to 0–1 floats for vertexColors
+        const cf = new Float32Array(parsed.count * 3);
+        for (let i = 0; i < cf.length; i++) cf[i] = parsed.colors[i] / 255;
+        geom.setAttribute("color", new THREE.BufferAttribute(cf, 3));
+      }
+      const mat = new THREE.PointsMaterial({
+        size: parseFloat(pcSizeSlider.value),
+        sizeAttenuation: false,
+        vertexColors: !!parsed.colors,
+        color: parsed.colors ? 0xffffff : 0xffffff,
+        transparent: false,
+        depthTest: true,
+        depthWrite: true,
+      });
+      const points = new THREE.Points(geom, mat);
+      points.frustumCulled = false;
+      // Parent to the splat so model rotation/recenter applies to both. If no
+      // splat is loaded yet, fall back to scene — user can load one after.
+      if (currentSplat) currentSplat.add(points);
+      else scene.add(points);
+      currentPointCloud = points;
+      applyPointCloudFlips();
+      pointCloudName = file.name;
+      pointCloudStatus.textContent = `${file.name} — ${parsed.count.toLocaleString()} pts${parsed.colors ? "" : " (no color)"}`;
+      showStatus(`Point cloud loaded: ${parsed.count.toLocaleString()} pts`);
+    }
+
+    function clearPointCloudOverlay() {
+      if (!currentPointCloud) return;
+      const parent = currentPointCloud.parent;
+      if (parent) parent.remove(currentPointCloud);
+      currentPointCloud.geometry.dispose();
+      currentPointCloud.material.dispose();
+      currentPointCloud = null;
+      pointCloudName = null;
+      pointCloudStatus.textContent = "No point cloud loaded";
+    }
 
     // ── Marker mode + panel handlers ──
     const markerModeBtn = document.getElementById("btn-marker-mode");
@@ -2223,6 +2345,9 @@
     document.getElementById("btn-recenter").addEventListener("click", recenterCamera);
 
     async function loadSplatURL(url, modelName, remoteUrl, fileBytes) {
+      // Detach point cloud from old splat so it survives the swap
+      const carriedPointCloud = (currentPointCloud && currentPointCloud.parent === currentSplat) ? currentPointCloud : null;
+      if (carriedPointCloud) currentSplat.remove(carriedPointCloud);
       if (currentSplat) {
         scene.remove(currentSplat);
         currentSplat.dispose?.();
@@ -2241,6 +2366,7 @@
           : new SplatMesh({ url });
         scene.add(splat);
         currentSplat = splat;
+        if (carriedPointCloud) splat.add(carriedPointCloud);
         await new Promise((r) => setTimeout(r, 2000));
         loadingEl.classList.add("fade-out");
         setTimeout(() => { loadingEl.style.display = "none"; }, 500);
