@@ -228,7 +228,8 @@
     #file-input,
     #file-input-b,
     #file-input-cloud,
-    #file-input-pointcloud {
+    #file-input-pointcloud,
+    #file-input-trajectory {
       position: absolute;
       left: -9999px;
       width: 1px;
@@ -745,11 +746,18 @@
       <button class="btn" id="btn-pause">Pause</button>
       <button class="btn" id="btn-load">Load .spz/.ply</button>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;font-size:11px;color:#a0a0a0;margin-top:6px;">
+    <div style="display:flex;gap:14px;align-items:center;font-size:11px;color:#a0a0a0;margin-top:6px;">
       <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
         <input type="checkbox" id="splat-visible" style="margin:0;" checked>
         Show splat
       </label>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;" title="Show world XYZ axes (red/green/blue) at the origin">
+        <input type="checkbox" id="world-axes" style="margin:0;">
+        World axes
+      </label>
+      <input type="number" id="world-axes-size" value="1" min="0.01" step="0.1" title="Axis length in world units"
+        style="width:46px;background:#0a0a0a;border:1px solid #2a2a2e;border-radius:4px;padding:2px 4px;font-size:10px;color:#e4e4e7;">
+      <button class="btn" id="btn-frame-axes" title="Move the camera to look at the world origin" style="padding:2px 6px;font-size:10px;">Frame</button>
     </div>
     <div class="btn-row" style="margin-top:8px;">
       <button class="btn" id="btn-save-pos" style="flex:1;">Save position</button>
@@ -790,6 +798,42 @@
           <input type="checkbox" id="pc-vertex-colors" style="margin:0;" checked>
           Use point colors from PLY
         </label>
+      </div>
+    </div>
+
+    <!-- Camera trajectory overlay -->
+    <div style="margin-top:10px;border-top:1px solid #2a2a2e;padding-top:10px;">
+      <div class="btn-row" style="margin-top:0;">
+        <button class="btn" id="btn-load-trajectory" style="flex:1;" title="Load a .json camera trajectory and render it as a 3D spline">Load trajectory .json</button>
+        <button class="btn" id="btn-clear-trajectory" title="Remove the loaded trajectory" style="padding:5px 10px;">×</button>
+      </div>
+      <div id="trajectory-status" style="font-size:10px;color:#666;margin-top:4px;line-height:1.3;">No trajectory loaded</div>
+      <div style="display:flex;gap:10px;align-items:center;font-size:11px;color:#a0a0a0;margin-top:6px;">
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+          <input type="checkbox" id="traj-show-points" style="margin:0;">
+          Show camera dots
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;">Width
+          <input type="number" id="traj-width" value="6" min="1" max="20" step="0.5"
+            style="width:42px;background:#0a0a0a;border:1px solid #2a2a2e;border-radius:4px;padding:2px 4px;font-size:10px;color:#e4e4e7;">
+        </label>
+      </div>
+      <!-- Animation controls -->
+      <div id="traj-anim" style="margin-top:8px;display:none;">
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button class="btn" id="btn-traj-play" style="padding:3px 10px;font-size:11px;width:54px;">▶ Play</button>
+          <button class="btn" id="btn-traj-reset" title="Rewind to t=0" style="padding:3px 8px;font-size:11px;">⟲</button>
+          <select id="traj-speed" title="Playback speed"
+            style="background:#0a0a0a;border:1px solid #2a2a2e;border-radius:4px;padding:2px 4px;font-size:10px;color:#e4e4e7;">
+            <option value="0.25">0.25×</option>
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="2">2×</option>
+            <option value="4">4×</option>
+          </select>
+          <span id="traj-time" style="font-size:10px;color:#a0a0a0;font-family:monospace;margin-left:auto;">0.0 / 0.0s</span>
+        </div>
+        <input type="range" id="traj-scrub" min="0" max="1" step="0.001" value="0" style="width:100%;margin-top:6px;">
       </div>
     </div>
 
@@ -909,6 +953,7 @@
   <input type="file" id="file-input-b" accept=".spz,.ply,.splat,.ksplat,.sogs,.sog" />
   <input type="file" id="file-input-cloud" accept=".ply" />
   <input type="file" id="file-input-pointcloud" accept=".ply" />
+  <input type="file" id="file-input-trajectory" accept=".json,application/json" />
   <!-- Posts/objects panel: vertical posts placed on the splat, used as snap-targets for markers -->
   <div id="posts-panel">
     <h3>Objects</h3>
@@ -1188,6 +1233,53 @@
     });
 
     document.getElementById("btn-load").addEventListener("click", () => fileInput.click());
+
+    // World-axes gizmo at the origin: red=X, green=Y, blue=Z
+    let worldAxes = null;
+    const worldAxesCb = document.getElementById("world-axes");
+    const worldAxesSize = document.getElementById("world-axes-size");
+    function rebuildWorldAxes() {
+      if (worldAxes) {
+        scene.remove(worldAxes);
+        worldAxes.geometry.dispose();
+        worldAxes.material.dispose();
+        worldAxes = null;
+      }
+      if (!worldAxesCb.checked) return;
+      const size = Math.max(0.01, parseFloat(worldAxesSize.value) || 1);
+      worldAxes = new THREE.AxesHelper(size);
+      // Render on top so it's visible through splats
+      worldAxes.material.depthTest = false;
+      worldAxes.material.depthWrite = false;
+      worldAxes.material.transparent = true;
+      worldAxes.renderOrder = 1000;
+      scene.add(worldAxes);
+    }
+    worldAxesCb.addEventListener("change", () => {
+      // On enable: if size is still 1 (default) and we have splat centers,
+      // auto-scale to ~10% of the splat bbox so the gizmo is proportional.
+      if (worldAxesCb.checked && splatCenters && parseFloat(worldAxesSize.value) === 1) {
+        let minX=Infinity,minY=Infinity,minZ=Infinity,maxX=-Infinity,maxY=-Infinity,maxZ=-Infinity;
+        for (let i = 0; i < splatCenters.length; i += 3) {
+          const x = splatCenters[i], y = splatCenters[i+1], z = splatCenters[i+2];
+          if (x<minX)minX=x; if (x>maxX)maxX=x;
+          if (y<minY)minY=y; if (y>maxY)maxY=y;
+          if (z<minZ)minZ=z; if (z>maxZ)maxZ=z;
+        }
+        const extent = Math.max(maxX-minX, maxY-minY, maxZ-minZ);
+        if (isFinite(extent) && extent > 0) worldAxesSize.value = (extent * 0.1).toFixed(2);
+      }
+      rebuildWorldAxes();
+    });
+    worldAxesSize.addEventListener("change", rebuildWorldAxes);
+    document.getElementById("btn-frame-axes").addEventListener("click", () => {
+      // Aim the orbit target at world origin and back off enough to see the axes.
+      const size = Math.max(0.01, parseFloat(worldAxesSize.value) || 1);
+      cameraTarget.set(0, 0, 0);
+      cameraDistance = Math.max(size * 3, 1);
+      if (!worldAxesCb.checked) { worldAxesCb.checked = true; rebuildWorldAxes(); }
+      showStatus(`Camera framed on world origin (axis size ${size})`);
+    });
 
     const splatVisibleCb = document.getElementById("splat-visible");
     splatVisibleCb.addEventListener("change", () => {
@@ -1480,6 +1572,345 @@
       currentPointCloud = null;
       pointCloudName = null;
       pointCloudStatus.textContent = "No point cloud loaded";
+    }
+
+    // Generate a soft circular sprite texture so THREE.Points renders as
+    // round dots instead of squares. Single shared texture.
+    function makeCircleSpriteTexture(diameter = 128) {
+      const c = document.createElement("canvas");
+      c.width = c.height = diameter;
+      const ctx = c.getContext("2d");
+      const r = diameter / 2;
+      ctx.beginPath();
+      ctx.arc(r, r, r - 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+    const circleSpriteTex = makeCircleSpriteTexture();
+
+    // ── Camera trajectory overlay (.json with {trajectory: [{x,y,z,t},...]}) ──
+    let trajectoryLine = null;     // Line2 spline
+    let trajectoryDots = null;     // THREE.Points at camera positions
+    let trajectoryRawPoints = null;
+    let trajectoryRawTimes = null; // Float32Array of t values aligned with raw points
+    let trajectoryMaxT = 0;
+    let trajectorySegmentT = null; // t value at each sampled spline point
+    let trajectoryFullPositions = null; // Float32Array of all sampled spline points (xyz per row)
+    let trajectoryPlaying = false;
+    let trajectoryCurrentT = 0;
+    let trajectorySpeed = 1;
+    let trajectoryHasTime = false;
+    let trajectoryCursor = null;   // single THREE.Points at current animated position
+    const fileInputTraj = document.getElementById("file-input-trajectory");
+    const trajStatus = document.getElementById("trajectory-status");
+    const trajShowPointsCb = document.getElementById("traj-show-points");
+    const trajWidthInput = document.getElementById("traj-width");
+    document.getElementById("btn-load-trajectory").addEventListener("click", () => fileInputTraj.click());
+    fileInputTraj.addEventListener("change", async (e) => {
+      const f = e.target.files[0];
+      if (f) await loadTrajectory(f);
+      fileInputTraj.value = "";
+    });
+    document.getElementById("btn-clear-trajectory").addEventListener("click", clearTrajectory);
+    trajShowPointsCb.addEventListener("change", () => {
+      if (trajectoryDots) trajectoryDots.visible = trajShowPointsCb.checked;
+    });
+    trajWidthInput.addEventListener("change", () => {
+      if (trajectoryLine) trajectoryLine.material.linewidth = Math.max(1, parseFloat(trajWidthInput.value) || 6);
+    });
+
+    async function loadTrajectory(file) {
+      trajStatus.textContent = `Reading ${file.name}…`;
+      let data;
+      try {
+        const text = await file.text();
+        data = JSON.parse(text);
+      } catch (err) {
+        trajStatus.textContent = `Parse failed: ${err.message}`;
+        return;
+      }
+      // Accept either { trajectory: [...] } or a bare array
+      const arr = Array.isArray(data) ? data : data.trajectory;
+      if (!Array.isArray(arr) || !arr.length) {
+        trajStatus.textContent = "JSON has no trajectory array";
+        return;
+      }
+      const pts = [];
+      const times = [];
+      let hasTime = arr.every((p) => isFinite(+p.t));
+      for (const p of arr) {
+        const x = +p.x, y = +p.y, z = +p.z;
+        if (isFinite(x) && isFinite(y) && isFinite(z)) {
+          pts.push(new THREE.Vector3(x, y, z));
+          times.push(hasTime ? +p.t : pts.length - 1);
+        }
+      }
+      if (pts.length < 2) {
+        trajStatus.textContent = "Need at least 2 valid points";
+        return;
+      }
+      clearTrajectory();
+      trajectoryRawPoints = pts;
+      trajectoryRawTimes = Float32Array.from(times);
+      trajectoryMaxT = trajectoryRawTimes[trajectoryRawTimes.length - 1];
+      trajectoryHasTime = hasTime;
+
+      // Smooth spline through the points using Catmull-Rom — segments scaled
+      // by total length so dense areas don't get over-sampled.
+      const curve = new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0.5);
+      const segments = Math.min(2000, Math.max(pts.length * 8, 64));
+      const sampled = curve.getPoints(segments);
+      const posFlat = new Float32Array(sampled.length * 3);
+      // Per-sample t value, linearly interpolated from raw t through the spline
+      // parameter u = i/segments → raw fractional index → lerp(times)
+      const segT = new Float32Array(sampled.length);
+      const rawN = pts.length;
+      for (let i = 0; i < sampled.length; i++) {
+        posFlat[i * 3]     = sampled[i].x;
+        posFlat[i * 3 + 1] = sampled[i].y;
+        posFlat[i * 3 + 2] = sampled[i].z;
+        const u = i / segments;
+        const rawF = u * (rawN - 1);
+        const i0 = Math.min(rawN - 1, Math.floor(rawF));
+        const i1 = Math.min(rawN - 1, i0 + 1);
+        const frac = rawF - i0;
+        segT[i] = trajectoryRawTimes[i0] * (1 - frac) + trajectoryRawTimes[i1] * frac;
+      }
+      trajectorySegmentT = segT;
+      trajectoryFullPositions = posFlat;
+      const lineGeom = new LineGeometry();
+      lineGeom.setPositions(posFlat);
+      const lineMat = new LineMaterial({
+        color: 0xffaa00,
+        linewidth: Math.max(1, parseFloat(trajWidthInput.value) || 6),
+        worldUnits: false,        // pixel-space width (consistent zoom feel)
+        resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
+        // Opaque pass so the line writes depth — splats then depth-test against
+        // it for proper "hidden behind tree" occlusion.
+        depthTest: true,
+        depthWrite: true,
+        transparent: false,
+      });
+      trajectoryLine = new Line2(lineGeom, lineMat);
+      trajectoryLine.computeLineDistances();
+      scene.add(trajectoryLine);
+
+      // Small dots at each camera position
+      const dotsPos = new Float32Array(pts.length * 3);
+      for (let i = 0; i < pts.length; i++) {
+        dotsPos[i * 3]     = pts[i].x;
+        dotsPos[i * 3 + 1] = pts[i].y;
+        dotsPos[i * 3 + 2] = pts[i].z;
+      }
+      const dotsGeom = new THREE.BufferGeometry();
+      dotsGeom.setAttribute("position", new THREE.BufferAttribute(dotsPos, 3));
+      const dotsMat = new THREE.PointsMaterial({
+        size: 12,
+        sizeAttenuation: false,
+        color: 0xffd454,
+        map: circleSpriteTex,
+        alphaTest: 0.5,            // round mask without alpha-blending (stays in opaque pass)
+        transparent: false,
+        depthTest: true,
+        depthWrite: true,
+      });
+      trajectoryDots = new THREE.Points(dotsGeom, dotsMat);
+      trajectoryDots.visible = trajShowPointsCb.checked;
+      scene.add(trajectoryDots);
+
+      // Cursor: Livelox-style chevron arrow lying flat in the XZ plane,
+      // pointing along the current motion direction. +X local is "forward"
+      // so rotation.y = atan2(-dz, dx) aims the tip down the path.
+      const cursorGeom = new THREE.BufferGeometry();
+      const arrowVerts = new Float32Array([
+         1.2, 0, 0.0,     // tip (forward = +X) — longer for elongated look
+        -0.7, 0, -0.5,    // back-left wing — narrower
+        -0.3, 0,  0.0,    // notch (centerline)
+        -0.7, 0,  0.5,    // back-right wing — narrower
+      ]);
+      cursorGeom.setAttribute("position", new THREE.BufferAttribute(arrowVerts, 3));
+      cursorGeom.setIndex([0, 1, 2, 0, 2, 3]);
+      cursorGeom.computeVertexNormals();
+      const cursorMat = new THREE.MeshBasicMaterial({
+        color: 0xffaa00,            // matches trajectory line color
+        side: THREE.DoubleSide,
+        depthTest: true,
+        depthWrite: true,
+        transparent: false,
+      });
+      trajectoryCursor = new THREE.Mesh(cursorGeom, cursorMat);
+      // Outline as a thick Line2 around the chevron's silhouette. More
+      // reliable than a coplanar filled mesh — uniform width and no depth
+      // fighting. Polyline order: tip → back-left → notch → back-right → tip.
+      const outlinePoly = new Float32Array([
+         1.2, 0,  0.0,
+        -0.7, 0, -0.5,
+        -0.3, 0,  0.0,
+        -0.7, 0,  0.5,
+         1.2, 0,  0.0,
+      ]);
+      const outlineGeom = new LineGeometry();
+      outlineGeom.setPositions(outlinePoly);
+      const outlineMat = new LineMaterial({
+        color: 0x402200,             // dark shade of the line's 0xffaa00
+        linewidth: 5,                // pixels
+        worldUnits: false,
+        resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
+        depthTest: true,
+        depthWrite: true,
+        transparent: false,
+      });
+      const outlineLine = new Line2(outlineGeom, outlineMat);
+      outlineLine.computeLineDistances();
+      outlineLine.position.y = 0.02;
+      trajectoryCursor.add(outlineLine);
+      // Track for resize updates
+      trajectoryCursor.userData.outlineLine = outlineLine;
+      // Sized relative to scene extent so it reads at any zoom
+      const extentEstimate = trajectoryRawPoints.reduce((m, p) => Math.max(m, Math.abs(p.x), Math.abs(p.z)), 1);
+      const arrowSize = Math.max(0.2, extentEstimate * 0.025);
+      trajectoryCursor.scale.setScalar(arrowSize);
+      trajectoryCursor.visible = false;
+      scene.add(trajectoryCursor);
+
+      // Show animation controls only when t data is present
+      const animPanel = document.getElementById("traj-anim");
+      animPanel.style.display = trajectoryHasTime ? "" : "none";
+      if (trajectoryHasTime) {
+        trajectoryCurrentT = 0;
+        trajectoryPlaying = false;
+        updateTrajectoryAnimationUI();
+        applyTrajectoryT(trajectoryCurrentT);
+      }
+
+      trajStatus.textContent = `${file.name} — ${pts.length} cameras, ${segments} spline segments` +
+        (trajectoryHasTime ? `, ${trajectoryMaxT.toFixed(1)}s` : " (no time data)");
+      showStatus(`Trajectory loaded: ${pts.length} cameras`);
+    }
+
+    // Apply a current time t: hide line segments past t, position cursor at
+    // the interpolated point. Uses geometry.instanceCount on the fat-line
+    // geometry to truncate the drawn portion without rebuilding buffers.
+    function applyTrajectoryT(t) {
+      if (!trajectoryLine || !trajectorySegmentT) return;
+      const segT = trajectorySegmentT;
+      const total = segT.length;
+      // Find first sample whose t > current t — that's how many points are "drawn"
+      let drawn = total;
+      for (let i = 0; i < total; i++) {
+        if (segT[i] > t) { drawn = i; break; }
+      }
+      // Fat-line geometry uses one instance per segment (drawn-1 segments)
+      const instGeom = trajectoryLine.geometry;
+      instGeom.instanceCount = Math.max(0, drawn - 1);
+
+      // Cursor: place at the interpolated point and rotate to face the
+      // direction of travel (yaw in XZ plane).
+      if (drawn === 0) {
+        trajectoryCursor.visible = false;
+      } else {
+        const a = trajectoryFullPositions;
+        let px, py, pz, dx, dz;
+        if (drawn >= total) {
+          const last = (total - 1) * 3, prev = (total - 2) * 3;
+          px = a[last]; py = a[last + 1]; pz = a[last + 2];
+          dx = a[last]     - a[prev];
+          dz = a[last + 2] - a[prev + 2];
+        } else {
+          const i0 = drawn - 1, i1 = drawn;
+          const t0 = segT[i0], t1 = segT[i1];
+          const frac = t1 > t0 ? (t - t0) / (t1 - t0) : 0;
+          const j0 = i0 * 3, j1 = i1 * 3;
+          px = a[j0]     * (1 - frac) + a[j1]     * frac;
+          py = a[j0 + 1] * (1 - frac) + a[j1 + 1] * frac;
+          pz = a[j0 + 2] * (1 - frac) + a[j1 + 2] * frac;
+          dx = a[j1]     - a[j0];
+          dz = a[j1 + 2] - a[j0 + 2];
+        }
+        trajectoryCursor.position.set(px, py, pz);
+        if (dx * dx + dz * dz > 1e-8) {
+          trajectoryCursor.rotation.set(0, Math.atan2(-dz, dx), 0);
+        }
+        trajectoryCursor.visible = true;
+      }
+
+      // Scrubber + time label
+      const scrub = document.getElementById("traj-scrub");
+      const label = document.getElementById("traj-time");
+      if (trajectoryMaxT > 0) scrub.value = (t / trajectoryMaxT).toFixed(4);
+      label.textContent = `${t.toFixed(1)} / ${trajectoryMaxT.toFixed(1)}s`;
+    }
+
+    function updateTrajectoryAnimationUI() {
+      const btn = document.getElementById("btn-traj-play");
+      btn.textContent = trajectoryPlaying ? "❚❚ Pause" : "▶ Play";
+    }
+
+    document.getElementById("btn-traj-play").addEventListener("click", () => {
+      if (!trajectoryLine || !trajectoryHasTime) return;
+      // If at end, rewind before playing
+      if (trajectoryCurrentT >= trajectoryMaxT) trajectoryCurrentT = 0;
+      trajectoryPlaying = !trajectoryPlaying;
+      updateTrajectoryAnimationUI();
+    });
+    document.getElementById("btn-traj-reset").addEventListener("click", () => {
+      trajectoryCurrentT = 0;
+      applyTrajectoryT(0);
+    });
+    document.getElementById("traj-speed").addEventListener("change", (e) => {
+      trajectorySpeed = parseFloat(e.target.value) || 1;
+    });
+    document.getElementById("traj-scrub").addEventListener("input", (e) => {
+      if (!trajectoryLine) return;
+      trajectoryPlaying = false;
+      updateTrajectoryAnimationUI();
+      trajectoryCurrentT = parseFloat(e.target.value) * trajectoryMaxT;
+      applyTrajectoryT(trajectoryCurrentT);
+    });
+
+    function tickTrajectoryAnimation(dt) {
+      if (!trajectoryPlaying || !trajectoryLine || !trajectoryHasTime) return;
+      trajectoryCurrentT += dt * trajectorySpeed;
+      if (trajectoryCurrentT >= trajectoryMaxT) {
+        trajectoryCurrentT = trajectoryMaxT;
+        trajectoryPlaying = false;
+        updateTrajectoryAnimationUI();
+      }
+      applyTrajectoryT(trajectoryCurrentT);
+    }
+
+    function clearTrajectory() {
+      if (trajectoryLine) {
+        scene.remove(trajectoryLine);
+        trajectoryLine.geometry.dispose();
+        trajectoryLine.material.dispose();
+        trajectoryLine = null;
+      }
+      if (trajectoryDots) {
+        scene.remove(trajectoryDots);
+        trajectoryDots.geometry.dispose();
+        trajectoryDots.material.dispose();
+        trajectoryDots = null;
+      }
+      if (trajectoryCursor) {
+        scene.remove(trajectoryCursor);
+        trajectoryCursor.geometry.dispose();
+        trajectoryCursor.material.dispose();
+        trajectoryCursor = null;
+      }
+      trajectoryRawPoints = null;
+      trajectoryRawTimes = null;
+      trajectorySegmentT = null;
+      trajectoryFullPositions = null;
+      trajectoryPlaying = false;
+      trajectoryCurrentT = 0;
+      trajectoryHasTime = false;
+      document.getElementById("traj-anim").style.display = "none";
+      trajStatus.textContent = "No trajectory loaded";
     }
 
     // ── Marker mode + panel handlers ──
@@ -1815,6 +2246,10 @@
       if (compareMode) {
         splitX = Math.max(0, Math.min(window.innerWidth, splitX));
         updateDividerPosition();
+      }
+      if (trajectoryLine) trajectoryLine.material.resolution.set(window.innerWidth, window.innerHeight);
+      if (trajectoryCursor?.userData?.outlineLine) {
+        trajectoryCursor.userData.outlineLine.material.resolution.set(window.innerWidth, window.innerHeight);
       }
     });
 
@@ -4762,6 +5197,7 @@
       updateMovement(dt);
       detectFace();
       updateCamera();
+      tickTrajectoryAnimation(dt);
 
       // Scale marker spheres + sprites by distance to camera so they stay
       // visually consistent at any zoom (~4% of view distance per pixel).
