@@ -21,6 +21,7 @@
       inset: 0;
       width: 100%;
       height: 100%;
+      touch-action: none; /* let JS handle pan/pinch — no browser scroll/zoom */
     }
 
     /* Webcam preview */
@@ -674,6 +675,12 @@
   <!-- Three.js canvas -->
   <canvas id="three-canvas"></canvas>
 
+  <!-- RAD LoD telemetry overlay (toggled from controls panel) -->
+  <div id="lod-overlay" style="display:none;position:fixed;top:120px;left:14px;z-index:50;background:rgba(8,10,18,0.92);border:1px solid #2a2a2e;border-radius:8px;padding:10px 12px;font-family:'Courier New',monospace;font-size:11px;color:#e4e4e7;line-height:1.45;max-width:360px;pointer-events:none;">
+    <div style="font-size:12px;font-weight:bold;color:#fff;margin-bottom:6px;letter-spacing:1px;">RAD LOD</div>
+    <table id="lod-overlay-table" style="border-collapse:collapse;width:100%;"></table>
+  </div>
+
   <!-- Webcam preview -->
   <div id="webcam-container" class="hidden-cam">
     <video id="webcam" autoplay playsinline muted></video>
@@ -744,7 +751,12 @@
     <div class="btn-row" style="margin-top:8px;">
       <button class="btn" id="btn-debug">Debug</button>
       <button class="btn" id="btn-pause">Pause</button>
-      <button class="btn" id="btn-load">Load .spz/.ply</button>
+      <button class="btn" id="btn-load" title=".spz / .ply / .splat / .ksplat / .sog(s) / .rad / .zip">Load splat</button>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+      <input type="text" id="url-a" placeholder="splat.rad — URL or filename"
+        style="flex:1;background:#0a0a0a;border:1px solid #2a2a2e;border-radius:5px;padding:5px 8px;font-size:11px;color:#e4e4e7;min-width:0;" />
+      <button class="btn" id="btn-load-a-url" style="padding:5px 10px;font-size:11px;" title=".rad files MUST load via URL (HTTP Range)">Load</button>
     </div>
     <div style="display:flex;gap:14px;align-items:center;font-size:11px;color:#a0a0a0;margin-top:6px;">
       <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
@@ -758,6 +770,17 @@
       <input type="number" id="world-axes-size" value="1" min="0.01" step="0.1" title="Axis length in world units"
         style="width:46px;background:#0a0a0a;border:1px solid #2a2a2e;border-radius:4px;padding:2px 4px;font-size:10px;color:#e4e4e7;">
       <button class="btn" id="btn-frame-axes" title="Move the camera to look at the world origin" style="padding:2px 6px;font-size:10px;">Frame</button>
+    </div>
+    <div style="display:flex;gap:14px;align-items:center;font-size:11px;color:#a0a0a0;margin-top:6px;">
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;" title="Toggle RAD LoD streaming telemetry overlay">
+        <input type="checkbox" id="lod-overlay-toggle" style="margin:0;">
+        RAD LOD overlay
+      </label>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;font-size:11px;color:#a0a0a0;margin-top:6px;">
+      <span style="white-space:nowrap;">LoD budget</span>
+      <input type="range" id="lod-budget" min="100000" max="10000000" step="100000" value="2500000" style="flex:1;">
+      <span id="lod-budget-val" style="min-width:48px;text-align:right;color:#e4e4e7;font-family:monospace;">2.50M</span>
     </div>
     <div class="btn-row" style="margin-top:8px;">
       <button class="btn" id="btn-save-pos" style="flex:1;">Save position</button>
@@ -949,8 +972,8 @@
     </div><!-- .controls-body -->
   </div>
 
-  <input type="file" id="file-input" accept=".spz,.ply,.splat,.ksplat,.sogs,.sog" />
-  <input type="file" id="file-input-b" accept=".spz,.ply,.splat,.ksplat,.sogs,.sog" />
+  <input type="file" id="file-input" accept=".spz,.ply,.splat,.ksplat,.sogs,.sog,.rad,.zip" />
+  <input type="file" id="file-input-b" accept=".spz,.ply,.splat,.ksplat,.sogs,.sog,.rad,.zip" />
   <input type="file" id="file-input-cloud" accept=".ply" />
   <input type="file" id="file-input-pointcloud" accept=".ply" />
   <input type="file" id="file-input-trajectory" accept=".json,application/json" />
@@ -1058,9 +1081,9 @@
   <script type="importmap">
     {
       "imports": {
-        "three": "https://esm.sh/three@0.171.0",
-        "three/": "https://esm.sh/three@0.171.0/",
-        "@sparkjsdev/spark": "https://esm.sh/@sparkjsdev/spark@0.1.10?external=three"
+        "three": "https://esm.sh/three@0.184.0",
+        "three/": "https://esm.sh/three@0.184.0/",
+        "@sparkjsdev/spark": "https://esm.sh/@sparkjsdev/spark@2.1.0?external=three"
       }
     }
   </script>
@@ -1281,6 +1304,220 @@
       showStatus(`Camera framed on world origin (axis size ${size})`);
     });
 
+    // ── Live LoD budget slider ──
+    const lodBudgetInput = document.getElementById("lod-budget");
+    const lodBudgetVal = document.getElementById("lod-budget-val");
+    lodBudgetInput.addEventListener("input", () => {
+      const v = parseInt(lodBudgetInput.value, 10);
+      sparkRenderer.lodSplatCount = v;
+      const fmt = v >= 1e6 ? (v / 1e6).toFixed(2) + "M" : (v / 1e3).toFixed(0) + "k";
+      lodBudgetVal.textContent = fmt;
+    });
+
+    // ── RAD LoD telemetry overlay ──
+    // Spark 2.x doesn't publish a stable stats API; we probe likely-named
+    // properties on SplatMesh + its pager + the renderer, and display whatever
+    // looks like useful state. Updates throttled to ~5 Hz to keep cost trivial.
+    const lodOverlayCb = document.getElementById("lod-overlay-toggle");
+    const lodOverlayEl = document.getElementById("lod-overlay");
+    const lodOverlayTable = document.getElementById("lod-overlay-table");
+    lodOverlayCb.addEventListener("change", () => {
+      lodOverlayEl.style.display = lodOverlayCb.checked ? "" : "none";
+      if (lodOverlayCb.checked) {
+        updateLodOverlay();
+        // First toggle-on after loading a splat: dump structure to console so
+        // we can discover undocumented LoD telemetry properties.
+        if (currentSplat) {
+          console.group("[RAD LoD] discovery dump — expand to find more telemetry props");
+          console.log("currentSplat:", currentSplat);
+          console.log("currentSplat.paged:", currentSplat.paged);
+          console.log("currentSplat.paged?.pager (inner — main telemetry source):", currentSplat.paged?.pager);
+          console.log("sparkRenderer:", sparkRenderer);
+          window._lodInspect = {
+            splat: currentSplat,
+            pager: currentSplat.paged,
+            innerPager: currentSplat.paged?.pager,
+            renderer: sparkRenderer,
+          };
+          console.log("→ Also exposed as window._lodInspect for poking.");
+          console.groupEnd();
+        }
+      }
+    });
+
+    function fmtNum(n) {
+      if (n == null) return "—";
+      if (typeof n !== "number" || !isFinite(n)) {
+        // Some "counter" fields are actually objects/Maps/Arrays — just length them
+        const len = lenOf(n);
+        if (len != null) return fmtNum(len);
+        return String(n).slice(0, 24);
+      }
+      const a = Math.abs(n);
+      if (a >= 1e9) return (n / 1e9).toFixed(2) + "B";
+      if (a >= 1e6) return (n / 1e6).toFixed(2) + "M";
+      if (a >= 1e3) return (n / 1e3).toFixed(2) + "k";
+      if (Number.isInteger(n)) return n.toString();
+      return n.toFixed(3);
+    }
+    function safeGet(obj, key) {
+      try { return obj?.[key]; } catch { return undefined; }
+    }
+    function lenOf(v) {
+      if (Array.isArray(v)) return v.length;
+      if (v && typeof v === "object" && "size" in v) return v.size;
+      if (v && typeof v === "object" && "length" in v) return v.length;
+      return undefined;
+    }
+
+    let lodOverlayTimer = null;
+    function startLodOverlayTicker() {
+      if (lodOverlayTimer) return;
+      lodOverlayTimer = setInterval(() => {
+        if (lodOverlayCb.checked) updateLodOverlay();
+      }, 200);
+    }
+    startLodOverlayTicker();
+
+    function row(label, value) {
+      return `<tr><td style="color:#9ca3af;padding:1px 8px 1px 0;white-space:nowrap;">${label}</td>` +
+             `<td style="text-align:right;color:#e4e4e7;padding:1px 0;">${value}</td></tr>`;
+    }
+
+    function fmtBytes(b) {
+      if (b == null || !isFinite(b)) return "—";
+      if (b >= 1e9) return (b / 1e9).toFixed(2) + " GB";
+      if (b >= 1e6) return (b / 1e6).toFixed(2) + " MB";
+      if (b >= 1e3) return (b / 1e3).toFixed(1) + " KB";
+      return b + " B";
+    }
+    function section(title) {
+      return `<tr><td colspan="2" style="color:#f59e0b;padding:6px 0 2px;font-size:10px;letter-spacing:0.5px;border-top:1px solid #2a2a2e;">${title}</td></tr>`;
+    }
+
+    function updateLodOverlay() {
+      const splat = currentSplat;
+      const paged = safeGet(splat, "paged");       // SplatPager (gg)
+      const innerPager = safeGet(paged, "pager");  // PagedSplats (iA) — main telemetry
+      const sr = sparkRenderer;
+
+      const rows = [];
+      if (!splat) {
+        lodOverlayTable.innerHTML = row("Status", "no splat loaded");
+        return;
+      }
+
+      // ── Selection / budget ──
+      rows.push(section("Selection"));
+      const active = safeGet(splat, "numSplats");
+      const budget = safeGet(sr, "lodSplatCount");
+      const lodScale = safeGet(splat, "lodScale") ?? safeGet(sr, "lodSplatScale");
+      const lodRenderScale = safeGet(splat, "lodRenderScale") ?? safeGet(sr, "lodRenderScale");
+      const lodInflate = safeGet(splat, "lodInflate") ?? safeGet(sr, "lodInflate");
+      const lastPixelLimit = safeGet(innerPager, "lastPixelLimit") ?? safeGet(sr, "lastPixelLimit");
+
+      rows.push(row("Status", paged ? `${(safeGet(paged, "fileType") || "paged").toUpperCase()} streaming` : "Non-paged"));
+      if (active != null && budget != null) {
+        const pct = budget > 0 ? (active / budget * 100).toFixed(1) + "%" : "—";
+        rows.push(row("Selected", `${fmtNum(active)} / ${fmtNum(budget)} (${pct})`));
+      }
+      if (lodScale != null) rows.push(row("LoD scale", "x" + (typeof lodScale === "number" ? lodScale.toFixed(2) : lodScale)));
+      if (lodRenderScale != null) rows.push(row("Render scale", "x" + (typeof lodRenderScale === "number" ? lodRenderScale.toFixed(2) : lodRenderScale)));
+      if (lodInflate != null) rows.push(row("LoD inflate", typeof lodInflate === "number" ? lodInflate.toFixed(3) : lodInflate));
+      if (lastPixelLimit != null) rows.push(row("Pixel limit", typeof lastPixelLimit === "number" ? lastPixelLimit.toFixed(4) : lastPixelLimit));
+
+      // ── Source / encoding ──
+      rows.push(section("Source"));
+      const rootUrl = safeGet(paged, "rootUrl");
+      const numSh = safeGet(paged, "numSh");
+      const maxSh = safeGet(paged, "maxSh") ?? safeGet(splat, "maxSh");
+      const enc = safeGet(paged, "splatEncoding");
+      if (rootUrl) rows.push(row("URL", String(rootUrl).split("/").pop().slice(0, 40)));
+      if (numSh != null) rows.push(row("SH", `${numSh} active / ${maxSh ?? "?"} max`));
+      if (enc) {
+        rows.push(row("RGB range", `[${enc.rgbMin?.toFixed?.(2)}, ${enc.rgbMax?.toFixed?.(2)}]`));
+        rows.push(row("LnScale range", `[${enc.lnScaleMin?.toFixed?.(1)}, ${enc.lnScaleMax?.toFixed?.(1)}]`));
+      }
+
+      // ── Cache / chunks ──
+      if (innerPager) {
+        rows.push(section("Cache"));
+        const pageToChunk = safeGet(innerPager, "pageToSplatsChunk");
+        const chunkToPage = safeGet(innerPager, "splatsChunkToPage");
+        const pageLru = safeGet(innerPager, "pageLru");
+        const pageFreelist = safeGet(innerPager, "pageFreelist");
+        const freeablePages = safeGet(innerPager, "freeablePages");
+        const pageSplats = safeGet(innerPager, "pageSplats");
+        const maxPagedSplats = safeGet(innerPager, "maxPagedSplats");
+        const totalBytes = safeGet(innerPager, "totalBytes");
+        const chunkBytes = safeGet(innerPager, "chunkBytes");
+
+        const numSlots = lenOf(pageToChunk);
+        const numMapped = lenOf(chunkToPage);
+        if (numSlots != null) {
+          rows.push(row("Pages", `${fmtNum(numMapped ?? 0)} mapped / ${fmtNum(numSlots)} slots`));
+        }
+        if (lenOf(pageLru) != null) rows.push(row("LRU depth", fmtNum(lenOf(pageLru))));
+        if (lenOf(pageFreelist) != null) rows.push(row("Freelist", fmtNum(lenOf(pageFreelist))));
+        if (lenOf(freeablePages) != null) rows.push(row("Freeable", fmtNum(lenOf(freeablePages))));
+        if (pageSplats != null) rows.push(row("Page size", fmtNum(pageSplats) + " splats"));
+        if (maxPagedSplats != null) rows.push(row("Pool", fmtNum(maxPagedSplats) + " splats"));
+        if (chunkBytes != null) rows.push(row("Chunk size", fmtBytes(chunkBytes)));
+        if (totalBytes != null) rows.push(row("Model bytes", fmtBytes(totalBytes)));
+
+        // ── Fetchers ──
+        rows.push(section("Fetchers"));
+        const fetchers = safeGet(innerPager, "fetchers");
+        const numFetchers = safeGet(innerPager, "numFetchers");
+        const numLodFetchers = safeGet(innerPager, "numLodFetchers");
+        const fetched = safeGet(innerPager, "fetched");
+        const fetchPause = safeGet(innerPager, "fetchPause");
+        const prefetchActive = safeGet(innerPager, "prefetchActive");
+        const enableLodFetching = safeGet(innerPager, "enableLodFetching") ?? safeGet(splat, "enableLodFetching");
+
+        if (numFetchers != null) rows.push(row("HTTP fetchers", `${numFetchers}${numLodFetchers != null ? ` (${numLodFetchers} LoD)` : ""}`));
+        else if (lenOf(fetchers) != null) rows.push(row("Fetchers", fmtNum(lenOf(fetchers))));
+        if (lenOf(fetched) != null) rows.push(row("Fetched", fmtNum(lenOf(fetched))));
+        if (fetchPause != null) rows.push(row("Fetch", fetchPause === 0 ? "active" : `paused (${fetchPause})`));
+        if (prefetchActive != null) rows.push(row("Prefetch", prefetchActive ? "active" : "idle"));
+        if (enableLodFetching != null) rows.push(row("LoD fetching", enableLodFetching ? "on" : "off"));
+      }
+
+      // ── Foveation ──
+      const coneFov = safeGet(splat, "coneFov");
+      const coneFov0 = safeGet(splat, "coneFov0");
+      const coneFoveate = safeGet(splat, "coneFoveate");
+      const behindFoveate = safeGet(splat, "behindFoveate");
+      if (coneFov != null || coneFoveate != null || behindFoveate != null) {
+        rows.push(section("Foveation"));
+        if (coneFov != null || coneFov0 != null) {
+          rows.push(row("Cone FoV", `${coneFov0 ?? "?"}° / ${coneFov ?? "?"}°`));
+        }
+        if (coneFoveate != null) rows.push(row("Edge falloff", "x" + coneFoveate.toFixed?.(2)));
+        if (behindFoveate != null) rows.push(row("Behind falloff", "x" + behindFoveate.toFixed?.(2)));
+      }
+
+      // ── Activity ──
+      // mappingVersion is the surest "selector ran this frame" tick — it
+      // increments any time the selected splat set changes. lodUpdates /
+      // lodTreeUpdates are internal QUEUES (drained per frame), not running
+      // totals, so they're useless as activity indicators.
+      rows.push(section("Activity"));
+      rows.push(row("Splat version", safeGet(splat, "version") ?? "—"));
+      rows.push(row("Mapping ver", safeGet(splat, "mappingVersion") ?? "—"));
+      const localFrame = safeGet(innerPager, "localFrame") ?? safeGet(sr, "localFrame");
+      const lastFrame = safeGet(innerPager, "lastFrame") ?? safeGet(sr, "lastFrame");
+      const currentLod = safeGet(innerPager, "currentLod") ?? safeGet(splat, "currentLod");
+      const lastLod = safeGet(innerPager, "lastLod") ?? safeGet(splat, "lastLod");
+      if (localFrame != null) rows.push(row("Frame", fmtNum(localFrame)));
+      if (lastFrame != null && lastFrame !== localFrame) rows.push(row("Last frame", fmtNum(lastFrame)));
+      if (currentLod != null) rows.push(row("Current LoD", fmtNum(currentLod)));
+      if (lastLod != null && lastLod !== currentLod) rows.push(row("Last LoD", fmtNum(lastLod)));
+      rows.push(row("FPS", document.getElementById("dbg-fps")?.textContent ?? "—"));
+
+      lodOverlayTable.innerHTML = rows.join("");
+    }
+
     const splatVisibleCb = document.getElementById("splat-visible");
     splatVisibleCb.addEventListener("change", () => {
       const v = splatVisibleCb.checked;
@@ -1308,6 +1545,20 @@
     fileInput.addEventListener("change", (e) => {
       const file = e.target.files[0];
       if (file) loadSplatFile(file);
+    });
+
+    // URL loader for splat A — required for .rad (streams via Range requests
+    // so it needs a real URL ending in .rad). Bare filenames are resolved
+    // relative to the page (i.e. served by the same dev server).
+    const urlAInput = document.getElementById("url-a");
+    document.getElementById("btn-load-a-url").addEventListener("click", () => {
+      const v = urlAInput.value.trim();
+      if (!v) return;
+      const name = v.split(/[?#]/)[0].split("/").pop() || v;
+      loadSplatURL(v, name, v, null);
+    });
+    urlAInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") document.getElementById("btn-load-a-url").click();
     });
 
     // ── Compare splats wiring ──
@@ -2360,6 +2611,110 @@
     // Prevent context menu on canvas
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
+    // ── Touch navigation: 1 finger = orbit, 2 fingers = pan + pinch-zoom ──
+    // Map identically to mouse so paint/markers also work with a single tap.
+    let touchState = null;
+    function touchAvg(t) { return { x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 }; }
+    function touchDist(t) {
+      const dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY;
+      return Math.hypot(dx, dy);
+    }
+    canvas.addEventListener("touchstart", (e) => {
+      if (pointerOverUI) return;
+      e.preventDefault();
+      const t = e.touches;
+      if (t.length === 1) {
+        // Single touch: paint/place modes treat it as a click; otherwise orbit.
+        if (postMode || markerMode) {
+          // Mirror mousedown LMB logic
+          if (!pickingPoints) {
+            if (currentSplat) setupPaintForSplat(currentSplat).catch(() => {});
+          } else {
+            const hit = pickSplatAt(t[0].clientX, t[0].clientY);
+            if (hit) {
+              if (postMode) placePost(hit.worldPos);
+              else placeMarker(snapToPostAxis(hit.worldPos) || hit.worldPos);
+            }
+          }
+          touchState = { mode: "tap" };
+          return;
+        }
+        if (paintMode) {
+          isPainting = true;
+          applyBrushAtCursor(t[0].clientX, t[0].clientY);
+          touchState = { mode: "paint", x: t[0].clientX, y: t[0].clientY };
+          return;
+        }
+        touchState = { mode: "orbit", x: t[0].clientX, y: t[0].clientY };
+      } else if (t.length >= 2) {
+        const c = touchAvg(t);
+        touchState = { mode: "pinch", cx: c.x, cy: c.y, dist: touchDist(t) };
+      }
+    }, { passive: false });
+
+    canvas.addEventListener("touchmove", (e) => {
+      if (!touchState || pointerOverUI) return;
+      e.preventDefault();
+      const t = e.touches;
+
+      if (touchState.mode === "paint" && t.length === 1) {
+        applyBrushAtCursor(t[0].clientX, t[0].clientY);
+        return;
+      }
+      if (touchState.mode === "orbit" && t.length === 1) {
+        const dx = t[0].clientX - touchState.x;
+        const dy = t[0].clientY - touchState.y;
+        cameraAzimuth   -= dx * rotateSpeed;
+        cameraElevation -= dy * rotateSpeed;
+        cameraElevation = Math.max(-ORBIT_PITCH_LIMIT, Math.min(ORBIT_PITCH_LIMIT, cameraElevation));
+        touchState.x = t[0].clientX;
+        touchState.y = t[0].clientY;
+        return;
+      }
+      if (touchState.mode === "pinch" && t.length >= 2) {
+        const c = touchAvg(t);
+        const d = touchDist(t);
+
+        // Pan by midpoint delta
+        const dx = c.x - touchState.cx;
+        const dy = c.y - touchState.cy;
+        const right = new THREE.Vector3(1, 0, 0).applyEuler(baseEuler);
+        const up    = new THREE.Vector3(0, 1, 0).applyEuler(baseEuler);
+        const k = panSpeed * cameraDistance;
+        cameraTarget.addScaledVector(right, -dx * k);
+        cameraTarget.addScaledVector(up,     dy * k);
+
+        // Pinch-zoom by distance ratio
+        if (touchState.dist > 0 && d > 0) {
+          const factor = touchState.dist / d;
+          if (cameraMode === "orthographic") {
+            orthoSize = Math.max(0.01, Math.min(2000, orthoSize * factor));
+          } else {
+            cameraDistance = Math.max(0.02, Math.min(2000, cameraDistance * factor));
+          }
+        }
+        touchState.cx = c.x;
+        touchState.cy = c.y;
+        touchState.dist = d;
+      }
+    }, { passive: false });
+
+    canvas.addEventListener("touchend", (e) => {
+      // Promote 2-finger gesture down to 1-finger orbit when one finger lifts
+      const t = e.touches;
+      if (t.length === 1 && touchState?.mode === "pinch") {
+        touchState = { mode: "orbit", x: t[0].clientX, y: t[0].clientY };
+        return;
+      }
+      if (t.length === 0) {
+        const wasPainting = isPainting;
+        isPainting = false;
+        touchState = null;
+        if (wasPainting) refreshTreesListUI();
+      }
+    });
+    canvas.addEventListener("touchcancel", () => { isPainting = false; touchState = null; });
+
     // Track pointer over UI panels
     for (const el of [debugEl, document.getElementById("controls"), document.getElementById("webcam-container")]) {
       el.addEventListener("pointerenter", () => { pointerOverUI = true; });
@@ -2465,7 +2820,15 @@
     // onBeforeRender — without it, updates are deferred via setTimeout(1) and
     // the two render() passes in compare mode reuse a stale visibility set
     // (resulting in only one splat being drawn on both halves).
-    const sparkRenderer = new SparkRenderer({ renderer, preUpdate: true });
+    // Spark 2.x LoD: lodSplatCount caps per-frame splat budget. Default is
+    // conservative (~250k) which renders .rad streams as low-detail discrete
+    // splats; bumping to 2.5M matches typical desktop GPU capacity and gives
+    // smooth blended quality similar to non-LoD .ply rendering.
+    const sparkRenderer = new SparkRenderer({
+      renderer,
+      preUpdate: true,
+      lodSplatCount: 2_500_000,
+    });
     scene.add(sparkRenderer);
 
     // ── Tree painting state ──
@@ -2837,6 +3200,11 @@
       if (carriedPointCloud) currentSplat.remove(carriedPointCloud);
       if (currentSplat) {
         scene.remove(currentSplat);
+        // Tear down paged streaming too — SplatMesh.dispose() in Spark 2.x
+        // doesn't seem to cancel the SplatPager's fetch loop, so a stale .rad
+        // would keep retrying (404 spam) after we swap to a different splat.
+        try { currentSplat.paged?.pager?.dispose?.(); } catch {}
+        try { currentSplat.paged?.dispose?.(); } catch {}
         currentSplat.dispose?.();
       }
       loadingText.textContent = "Loading splat...";
@@ -2848,9 +3216,20 @@
       try {
         // For local files we pass fileBytes + fileName so SparkJS can infer format
         // (blob: URLs have no extension, so URL-based inference fails).
-        const splat = fileBytes
-          ? new SplatMesh({ fileBytes, fileName: modelName })
-          : new SplatMesh({ url });
+        // .rad streams via HTTP Range requests so it always needs a URL — wrap
+        // local fileBytes in a blob: URL and let Spark range-request from it.
+        const isRad = ((modelName || url || "")).toLowerCase().endsWith(".rad");
+        let splatOpts;
+        if (isRad) {
+          let radUrl = url;
+          if (!radUrl && fileBytes) {
+            radUrl = URL.createObjectURL(new Blob([fileBytes], { type: "application/octet-stream" }));
+          }
+          splatOpts = { url: radUrl, fileType: "rad", paged: true };
+        } else {
+          splatOpts = fileBytes ? { fileBytes, fileName: modelName } : { url };
+        }
+        const splat = new SplatMesh(splatOpts);
         scene.add(splat);
         currentSplat = splat;
         splat.visible = splatVisibleCb.checked;
@@ -2884,6 +3263,9 @@
       } catch (err) {
         console.error("Failed to load splat:", err);
         loadingText.textContent = "Failed to load splat. Check console.";
+        // Clear cached "last model" so a broken URL doesn't auto-restore
+        // (and re-spam fetch errors) on every page reload.
+        try { localStorage.removeItem(LAST_MODEL_KEY); } catch {}
       }
     }
 
@@ -3238,8 +3620,31 @@
         console.warn("Splat initialized promise rejected:", e);
         return;
       }
-      const n = splatMesh.packedSplats?.numSplats ?? 0;
-      if (!n) return;
+      // Paged .rad files have a dynamic, camera-driven selection of splats —
+      // the visible 2-3M subset changes whenever the LoD selector reruns, so
+      // CPU-side paint/marker indices wouldn't be stable. Disable paint setup
+      // and surface a status message so the buttons don't silently no-op.
+      if (splatMesh.paged) {
+        console.warn("[paint setup] splat is paged — paint disabled.", {
+          rootUrl: splatMesh.paged?.rootUrl, fileType: splatMesh.paged?.fileType,
+          numSplats: splatMesh.numSplats,
+        });
+        setPaintStatus("Paint/markers require a non-paged splat (.ply / .sog). Load the original splat for painting.", "#f59e0b");
+        return;
+      }
+      // .ply / .sog / .spz path — packedSplats has the static buffer.
+      const n = splatMesh.packedSplats?.numSplats ?? splatMesh.numSplats ?? 0;
+      console.log("[paint setup] non-paged splat", {
+        packedSplats_numSplats: splatMesh.packedSplats?.numSplats,
+        splatMesh_numSplats: splatMesh.numSplats,
+        n,
+        hasForEachSplat: typeof splatMesh.forEachSplat === "function",
+        splatsRef: splatMesh.splats,
+      });
+      if (!n) {
+        setPaintStatus("Paint setup: splat has 0 splats accessible (Spark 2.x field rename?).", "#dc2626");
+        return;
+      }
 
       // Always extract trained-splat centers — used as default paint target,
       // and (if a denser cloud is loaded) kept for export-time projection
@@ -4957,9 +5362,18 @@
         currentSplatB = null;
       }
       try {
-        const splat = fileBytes
-          ? new SplatMesh({ fileBytes, fileName: name })
-          : new SplatMesh({ url });
+        const isRadB = ((name || url || "")).toLowerCase().endsWith(".rad");
+        let splatOptsB;
+        if (isRadB) {
+          let radUrlB = url;
+          if (!radUrlB && fileBytes) {
+            radUrlB = URL.createObjectURL(new Blob([fileBytes], { type: "application/octet-stream" }));
+          }
+          splatOptsB = { url: radUrlB, fileType: "rad", paged: true };
+        } else {
+          splatOptsB = fileBytes ? { fileBytes, fileName: name } : { url };
+        }
+        const splat = new SplatMesh(splatOptsB);
         // Match A's transform so the two overlap as one
         splat.position.copy(currentSplat.position);
         splat.rotation.copy(currentSplat.rotation);
@@ -5269,7 +5683,9 @@
       frameCount++;
       const now = performance.now();
       if (now - lastFpsTime >= 1000) {
-        if (debugVisible) dbgFps.textContent = frameCount;
+        // Update FPS unconditionally so other UI (LoD overlay) can read it
+        // even when the debug panel is hidden.
+        dbgFps.textContent = frameCount;
         frameCount = 0;
         lastFpsTime = now;
       }
@@ -5337,7 +5753,13 @@
         if (!loaded) {
           const lastModel = getLastModel();
           if (lastModel) {
-            if (lastModel.url) {
+            // Skip auto-restore for .rad URLs — paged streaming + stale paths
+            // can spam fetch failures forever. User must re-load explicitly.
+            const isRadRestore = (lastModel.name || lastModel.url || "").toLowerCase().endsWith(".rad");
+            if (isRadRestore) {
+              console.log("[init] Skipping auto-restore of .rad model:", lastModel.name);
+              localStorage.removeItem(LAST_MODEL_KEY);
+            } else if (lastModel.url) {
               await loadSplatURL(lastModel.url, lastModel.name, lastModel.url);
               loaded = true;
             } else {

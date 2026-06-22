@@ -1,1 +1,11 @@
 .vercel
+.claude/
+8K100/
+*.rad
+*.ply
+*.spz
+*.splat
+*.ksplat
+*.sog
+*.sogs
+image.png
