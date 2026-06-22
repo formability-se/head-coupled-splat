@@ -758,6 +758,13 @@
         style="flex:1;background:#0a0a0a;border:1px solid #2a2a2e;border-radius:5px;padding:5px 8px;font-size:11px;color:#e4e4e7;min-width:0;" />
       <button class="btn" id="btn-load-a-url" style="padding:5px 10px;font-size:11px;" title=".rad files MUST load via URL (HTTP Range)">Load</button>
     </div>
+    <div style="margin-top:6px;">
+      <select id="example-splats"
+        style="width:100%;background:#0a0a0a;border:1px solid #2a2a2e;border-radius:5px;padding:5px 8px;font-size:11px;color:#e4e4e7;font-family:inherit;"
+        title="Pick a hosted example .rad to load">
+        <option value="">— Example splats —</option>
+      </select>
+    </div>
     <div style="display:flex;gap:14px;align-items:center;font-size:11px;color:#a0a0a0;margin-top:6px;">
       <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
         <input type="checkbox" id="splat-visible" style="margin:0;" checked>
@@ -1559,6 +1566,51 @@
     });
     urlAInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") document.getElementById("btn-load-a-url").click();
+    });
+
+    // Example .rad files hosted on Cloudflare R2 — populated from
+    // {base}/manifest.json so we don't have to redeploy when adding new files.
+    // Regenerate the manifest with tools/update-manifest.ps1 after each upload.
+    const SAMPLE_SPLATS_BASE = "https://pub-5c1471ebe7084cb2954c76753188606e.r2.dev";
+    const exampleSelect = document.getElementById("example-splats");
+
+    function deriveLabel(file) {
+      return file.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
+    }
+
+    (async () => {
+      try {
+        const r = await fetch(`${SAMPLE_SPLATS_BASE}/manifest.json`, { cache: "no-store" });
+        if (!r.ok) throw new Error(`manifest.json: HTTP ${r.status}`);
+        const data = await r.json();
+        // Accept either a bare array of filenames or an object with `splats`
+        // entries that may include explicit labels.
+        const list = Array.isArray(data)
+          ? data.map((f) => (typeof f === "string" ? { file: f } : f))
+          : (data.splats || []);
+        for (const s of list) {
+          if (!s.file) continue;
+          const opt = document.createElement("option");
+          opt.value = s.file;
+          opt.textContent = s.label || deriveLabel(s.file);
+          exampleSelect.appendChild(opt);
+        }
+        if (!list.length) {
+          exampleSelect.querySelector("option").textContent = "— No samples in manifest —";
+        }
+      } catch (err) {
+        console.warn("[examples] manifest.json fetch failed:", err);
+        exampleSelect.querySelector("option").textContent = "— Sample list unavailable —";
+      }
+    })();
+
+    exampleSelect.addEventListener("change", () => {
+      if (!exampleSelect.value) return;
+      const url = `${SAMPLE_SPLATS_BASE}/${exampleSelect.value}`;
+      urlAInput.value = url;
+      loadSplatURL(url, exampleSelect.value, url, null);
+      // Reset selection so picking the same item again still triggers a load
+      exampleSelect.value = "";
     });
 
     // ── Compare splats wiring ──
