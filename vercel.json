@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/r2/:path*", "destination": "https://splatassets.com/:path*" }
+  ]
+}

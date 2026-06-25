@@ -1571,7 +1571,14 @@
     // Example .rad files hosted on Cloudflare R2 — populated from
     // {base}/manifest.json so we don't have to redeploy when adding new files.
     // Regenerate the manifest with tools/update-manifest.ps1 after each upload.
-    const SAMPLE_SPLATS_BASE = "https://splatassets.com";
+    // Proxied through splat.formability.se via Vercel rewrites (see vercel.json).
+    // Lets the viewer fetch R2-hosted .rad files without the browser hitting
+    // splatassets.com directly — useful when corporate firewalls block the R2
+    // domain but allow the main app domain. Local dev (npx serve) has no
+    // rewrites, so fall back to the direct URL.
+    const SAMPLE_SPLATS_BASE = (location.hostname === "localhost" || location.hostname === "127.0.0.1")
+      ? "https://splatassets.com"
+      : "/r2";
     const exampleSelect = document.getElementById("example-splats");
 
     function deriveLabel(file) {
